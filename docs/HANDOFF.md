@@ -1,5 +1,11 @@
 # Handoff
 
+## 2026-11-15 (10) · Claude Code · rama `agente/claude/ux-registro-estado`
+
+- Registro: cuando "Abrir ticket" está desactivado, se muestra qué falta ("Falta: especifica el motivo y describe el producto.").
+- El estado del agente en la barra lateral se actualiza cada 10 s (antes 30 s): evitaba ver "sin conexión" justo al arrancar.
+- Probado en navegador contra la demo: el aviso cambia al escribir, el botón se activa y el ticket se registra; sin errores de consola.
+
 ## 2026-11-15 (9) · Claude Code · Copia a Google Sheets
 
 - `app/src/sheets-sync.js`: cada minuto envía los tickets que cambiaron (por hash) y los eventos nuevos al Apps Script de la hoja.

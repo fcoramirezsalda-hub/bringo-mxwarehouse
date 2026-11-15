@@ -92,10 +92,17 @@ async function identify(raw, how) {
   try { R.existing = await api('GET', '/api/incidents/check?' + new URLSearchParams(R.code ? { code: R.code } : { trk: R.trk })); } catch {}
   render();
 }
+function missing(R) {
+  const m = [];
+  if (R.type === 'otro' && !(R.f.otro || '').trim()) m.push('especifica el motivo');
+  if (R.nolabel && !(R.f.desc || '').trim()) m.push('describe el producto');
+  return m;
+}
+const hintText = R => { const m = missing(R); return m.length ? 'Falta: ' + m.join(' y ') + '.' : ''; };
 function vRegistro() {
   const R = S.R, s = R ? R.step : 1, cls = n => s > n ? 'done' : s === n ? 'cur' : 'locked';
   const types = Object.keys(S.me.types).filter(k => !(R && R.nolabel && !['sinetiqueta', 'otro'].includes(k)));
-  const ready = R && R.type && (R.type !== 'otro' || (R.f.otro || '').trim()) && (!R.nolabel || (R.f.desc || '').trim());
+  const ready = R && R.type && !missing(R).length;
   return `<div class="reg"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">
   ${S.last ? `<div class="banner ok"><span class="ic">✓</span><div><b>${S.last.appended ? 'Agregado a ' + S.last.folio : 'Registrado ' + S.last.folio}</b>${esc(S.last.label)} · ${S.last.appended ? 'se agregó al ticket abierto' : S.last.status === 'Enviado dañado' ? 'quedó en el registro de enviados dañados' : 'ticket abierto; Victor y Customer Service ya lo ven'}.</div></div>` : ''}
   <section class="stepcard ${cls(1)}">
@@ -116,7 +123,7 @@ function vRegistro() {
     ${s === 2 ? `<div class="typegrid">${types.map(k => `<button class="type${k === 'inbound' ? ' feat' : ''}${R.type === k ? ' on' : ''}" data-a="type" data-v="${k}"><b>${esc(T(k))}</b>${k === 'inbound' ? '<span class="act">El tracking no escanea, no es válido o no aparece en la plataforma</span>' : ''}${k === 'otro' ? '<span class="act">Especifica el motivo</span>' : ''}</button>`).join('')}</div>
       ${R.type === 'otro' ? `<div class="field"><label class="lbl" for="f-otro">Especifica el motivo · obligatorio</label><input type="text" id="f-otro" data-f="otro" value="${esc(R.f.otro || '')}" maxlength="300"></div>` : ''}
       ${R.nolabel ? `<div class="field"><label class="lbl" for="f-desc">Descripción del producto · obligatoria</label><input type="text" id="f-desc" data-f="desc" value="${esc(R.f.desc || '')}" maxlength="300" placeholder="Ej. lámpara LED de escritorio negra"></div>` : ''}
-      ${R.type ? `<div class="regfoot"><div class="small">${R.type === 'danado' ? 'Re-empácalo y envíalo. Queda en el registro de enviados dañados.' : 'Se abre sin responsable para Victor y Customer Service.'}<br><span class="muted">A nombre de <b>${esc(S.me.name)}</b>, con fecha y hora.</span></div>
+      ${R.type ? `<div class="regfoot"><div class="small">${R.type === 'danado' ? 'Re-empácalo y envíalo. Queda en el registro de enviados dañados.' : 'Se abre sin responsable para Victor y Customer Service.'}<br><span class="muted">A nombre de <b>${esc(S.me.name)}</b>, con fecha y hora.</span><br><span class="err" id="reghint">${esc(hintText(R))}</span></div>
         <button class="btn danger" data-a="register" id="regbtn" ${ready ? '' : 'disabled'}>${R.type === 'danado' ? 'Registrar envío dañado' : 'Abrir ticket'}</button></div>` : '<p class="muted small">Elige el motivo; después presiona “Abrir ticket”.</p>'}`
     : '<p class="muted">Primero identifica el paquete.</p>'}
   </section></div>
@@ -299,7 +306,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('input', e => {
   const el = e.target;
-  if (el.dataset.f && S.R) { S.R.f[el.dataset.f] = el.value; const R = S.R, b = $('#regbtn'); if (b) b.disabled = !((R.type !== 'otro' || (R.f.otro || '').trim()) && (!R.nolabel || (R.f.desc || '').trim())); }
+  if (el.dataset.f && S.R) { S.R.f[el.dataset.f] = el.value; const R = S.R, b = $('#regbtn'), h = $('#reghint'); if (b) b.disabled = missing(R).length > 0; if (h) h.textContent = hintText(R); }
   if (el.dataset.ui) S.ui[el.dataset.ui] = el.value;
 });
 document.addEventListener('change', async e => {
@@ -360,7 +367,7 @@ async function agentStatus() {
   if (!S.me) return;
   try { const s = await api('GET', '/api/agent-status'); $('#agent').innerHTML = `<span class="dot ${s.online ? '' : 'agentdot off'}"></span> Agente de búsqueda · ${s.online ? 'en línea' : 'sin conexión' + (s.last_seen ? ' desde ' + fdt(s.last_seen) : '')}${s.queue ? ` · ${s.queue} en cola` : ''}`; } catch {}
 }
-setInterval(agentStatus, 30000);
+setInterval(agentStatus, 10000);
 
 async function boot() {
   try { S.me = await api('GET', '/api/me'); } catch { return; }
