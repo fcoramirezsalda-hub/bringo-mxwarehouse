@@ -50,11 +50,20 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 3.3 | Propuesta de sincronización con Google Sheets de retornos | ChatGPT → propietario | pendiente |
 | 3.4 | Implementar la sincronización aprobada | Claude Code | bloqueado: falta aprobación |
 
+## Piloto en la bodega
+
+| # | Tarea | Responsable | Estado |
+|---|---|---|---|
+| M.3 | Instalación en la PC piloto (`D:\app`, Edge como navegador del agente) | Claude Code + propietario | en curso: falta firewall y acceso desde otros equipos |
+| M.4 | Ticket de prueba real: agente con Bringgo/EasyShip y copia en la hoja | Propietario | pendiente |
+| M.5 | Revisar `npm audit` y actualizar dependencias con pruebas | Claude Code | pendiente (requiere aprobación) |
+
 ## Hecho
 
 | # | Tarea | Responsable | Fecha |
 |---|---|---|---|
 | M.1 | MVP de incidencias en `app/` (servidor, BD, interfaz, agente, pruebas) | Claude Code | 2026-11-15 |
+| M.2 | Hoja de Google (Tickets e Historial) creada y Apps Script conectado | Claude Code + propietario | 2026-11-15 |
 
 ### Anteriores
 

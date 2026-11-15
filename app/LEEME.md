@@ -10,19 +10,27 @@ y un agente busca la información de la orden en Bringgo y EasyShip (solo lectur
 
 ## Instalación (una vez)
 
-1. Copia la carpeta `app` a la PC, por ejemplo `C:\wms-agente\app`.
-2. Abre "Símbolo del sistema" en esa carpeta y ejecuta, uno por uno:
+1. Copia la carpeta `app` a la PC, por ejemplo `C:\wms-agente\app` o `D:\app`.
+   **No la pongas dentro de OneDrive**: la sincronización puede bloquear o dañar la base de datos de `data\`.
+2. Abre "Símbolo del sistema" en esa carpeta (en el Explorador, escribe `cmd` en la barra de direcciones y Enter).
+   Comprueba Node con `node -v`; si no lo reconoce, instálalo (`winget install OpenJS.NodeJS.LTS`) y abre una ventana nueva.
+3. Ejecuta, uno por uno, esperando a que vuelva a aparecer la ruta antes del siguiente:
 
 ```
 npm install
-npx playwright install chromium
 npm run setup
 ```
+
+El agente usa **Microsoft Edge**, que ya viene en Windows, así que no hace falta descargar Chromium.
+Para usar otro navegador: `set AGENT_BROWSER=chrome` (Google Chrome instalado) o `set AGENT_BROWSER=chromium`
+(el de Playwright; requiere `npx playwright install chromium`, unos 400 MB en el disco C:).
+
+No ejecutes `npm audit fix --force`: cambia las versiones fijas de Express y Playwright y puede romper la app.
 
 `npm run setup` crea la base de datos y muestra **un PIN de 4 dígitos para cada persona**. Anótalos y entrégalos en persona;
 no se vuelven a mostrar. Francisco R. puede restablecer cualquier PIN desde "Equipo y permisos".
 
-3. Inicia sesión en Bringgo y EasyShip para el agente (se abre un navegador; inicias sesión tú y lo cierras):
+4. Inicia sesión en Bringgo y EasyShip para el agente (se abre Edge; inicias sesión tú y lo cierras):
 
 ```
 npm run agent:login
@@ -45,6 +53,20 @@ npm run agent
 - En la PC: http://localhost:8080
 - En otros equipos de la red de la bodega: la dirección que muestra `npm start` (por ejemplo http://192.168.1.50:8080).
   La primera vez, Windows pregunta si permite el acceso en la red: elige **Redes privadas**.
+- Los otros equipos no instalan nada: solo abren esa dirección en el navegador, conectados a la misma red (no la de invitados).
+
+### Si los otros equipos no pueden abrir la dirección
+
+1. En la PC del servidor, la red debe tener perfil **Privada**: Configuración → Red e Internet → Wi‑Fi o Ethernet → la red → Tipo de perfil de red.
+2. Abre el puerto 8080 en el firewall. Abre una ventana **como administrador**
+   (`powershell -Command "Start-Process cmd -Verb RunAs"` y responde Sí; el título debe decir "Administrador") y ejecuta:
+
+```
+netsh advfirewall firewall add rule name="MX Wharehouse 8080" dir=in action=allow protocol=TCP localport=8080 profile=private
+```
+
+   Windows responde `Aceptar`. Si dice "requiere elevación", la ventana no está como administrador.
+3. Pide que el router le reserve una IP fija a esta PC, para que la dirección no cambie.
 
 ## Que arranque solo al encender la PC
 

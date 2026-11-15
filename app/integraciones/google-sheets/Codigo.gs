@@ -22,6 +22,7 @@ function doPost(e) {
     var rows = body.tickets || [];
     if (rows.length) {
       var width = rows[0].length, last = t.getLastRow();
+      espacio_(t, last + rows.length, width);
       var folios = last > 1 ? t.getRange(2, 1, last - 1, 1).getValues() : [];
       var idx = {};
       for (var i = 0; i < folios.length; i++) idx[String(folios[i][0])] = i + 2;
@@ -37,13 +38,21 @@ function doPost(e) {
       var lastRow = h.getLastRow();
       var lastId = lastRow > 1 ? Number(h.getRange(lastRow, 1).getValue()) || 0 : 0;
       evs = evs.filter(function (ev) { return Number(ev[0]) > lastId; });
-      if (evs.length) { h.getRange(lastRow + 1, 1, evs.length, evs[0].length).setNumberFormat('@').setValues(evs); events = evs.length; }
+      if (evs.length) { espacio_(h, lastRow + evs.length, evs[0].length); h.getRange(lastRow + 1, 1, evs.length, evs[0].length).setNumberFormat('@').setValues(evs); events = evs.length; }
     }
     return out({ ok: true, updated: updated, added: added, events: events });
   } finally { lock.releaseLock(); }
 }
 
 function doGet() { return ContentService.createTextOutput('MX Wharehouse · copia a Google Sheets activa'); }
+
+// Agrega filas o columnas antes de escribir: getRange falla si el rango sale de la hoja.
+// Deja 500 filas de margen para no ampliar en cada envío.
+function espacio_(s, filas, columnas) {
+  var maxF = s.getMaxRows(), maxC = s.getMaxColumns();
+  if (filas > maxF) s.insertRowsAfter(maxF, filas - maxF + 500);
+  if (columnas > maxC) s.insertColumnsAfter(maxC, columnas - maxC);
+}
 
 function hoja_(ss, name, headers) {
   var s = ss.getSheetByName(name) || ss.insertSheet(name);

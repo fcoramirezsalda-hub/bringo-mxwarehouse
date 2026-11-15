@@ -37,7 +37,7 @@ Decisión 2026-11-15: MVP nuevo e independiente (el repositorio del WMS original
 | Reglas de negocio | `app/src/domain.js` (permisos, anti-duplicado, toma atómica, plazos idempotentes) |
 | Interfaz | HTML + JavaScript sin framework (`app/public/`), basada en el prototipo |
 | Sesión | Usuario + PIN de 4 dígitos (scrypt), cookie HttpOnly de 14 h, bloqueo tras 5 intentos |
-| Agente de búsqueda | Proceso aparte `app/src/worker.js` + `app/src/connectors.js` (Playwright, solo lectura) |
+| Agente de búsqueda | Proceso aparte `app/src/worker.js` + `app/src/connectors.js` (Playwright con Microsoft Edge, solo lectura) |
 | Evidencias | Archivos en `app/data/evidencias/<ticket>/`, sin borrado desde la aplicación |
 | Pruebas | `npm test` (node:test) |
 
