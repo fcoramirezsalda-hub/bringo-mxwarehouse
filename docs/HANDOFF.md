@@ -1,5 +1,12 @@
 # Handoff
 
+## 2026-11-15 (11) · Claude Code · Plan de pruebas para pedir la nube
+
+- Nuevo `docs/PLAN_PRUEBAS_NUBE.md`: qué probar antes de pedir la migración (reglas, API y permisos, concurrencia, agente, interfaz, seguridad, CI, migración de datos, piloto en piso) y lista de salida.
+- Hallazgos que bloquean la nube (B1–B9): PIN de 4 dígitos sin límite por IP, `/api/login-users` público, cookie sin `Secure`, agente que abre el mismo SQLite, evidencias en disco local, plazos con `setInterval`, "hoy" calculado con la hora del servidor (UTC en la nube), anti-duplicado que depende de SQLite, respaldos manuales.
+- `npm test`: 9/9 pasan tras `npm ci`; sin dependencias instaladas falla. No hay CI.
+- No se cambió código. B4 y B8 son cambios de arquitectura: esperan aprobación.
+
 ## 2026-11-15 (10) · Claude Code · rama `agente/claude/ux-registro-estado`
 
 - Registro: cuando "Abrir ticket" está desactivado, se muestra qué falta ("Falta: especifica el motivo y describe el producto.").

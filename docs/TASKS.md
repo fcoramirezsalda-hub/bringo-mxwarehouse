@@ -50,10 +50,21 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 3.3 | Propuesta de sincronización con Google Sheets de retornos | ChatGPT → propietario | pendiente |
 | 3.4 | Implementar la sincronización aprobada | Claude Code | bloqueado: falta aprobación |
 
+## Fase 4 · Preparación para la nube (ver PLAN_PRUEBAS_NUBE.md)
+
+| # | Tarea | Responsable | Estado |
+|---|---|---|---|
+| 4.1 | CI: `npm ci && npm test` con `TZ=UTC` en cada push | Codex | pendiente |
+| 4.2 | Pruebas faltantes de reglas y permisos (secciones 4.1 y 4.2 del plan) | Codex | pendiente |
+| 4.3 | Resolver B1–B3 y B7 (login, cookie, zona horaria) | Claude Code | pendiente |
+| 4.4 | API del agente, evidencias en almacenamiento privado, base en la nube (B4, B5, B8) | Claude Code | pendiente (requiere aprobación) |
+| 4.5 | Piloto de 2 semanas en piso y prueba del agente con datos reales | Propietario + Claude Code | pendiente |
+
 ## Hecho
 
 | # | Tarea | Responsable | Fecha |
 |---|---|---|---|
+| T.1 | Plan de pruebas para pedir la migración a la nube | Claude Code | 2026-11-15 |
 | M.1 | MVP de incidencias en `app/` (servidor, BD, interfaz, agente, pruebas) | Claude Code | 2026-11-15 |
 
 ### Anteriores
