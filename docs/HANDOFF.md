@@ -1,5 +1,36 @@
 # Handoff
 
+## 2026-11-15 (10) · Claude Code · Instalación en la PC piloto y hoja de Google
+
+### Qué cambió
+- **Hoja de Google creada** en el Drive del propietario: "MX Wharehouse · Tickets de incidencias", con las pestañas
+  **Tickets** (las 22 columnas de `HEADERS`) e **Historial** (las 6 de `EVENT_HEADERS`), encabezado fijo y columnas como texto.
+  El Apps Script ya está instalado y la prueba de `npm run sheets:setup` pasó.
+- `Codigo.gs`: nueva función `espacio_()` que agrega filas (con 500 de margen) y columnas antes de escribir.
+  Antes, `getRange` fallaba al pasar de las 1,000 filas de la hoja; Historial llegaba primero.
+- `worker.js`: el agente abre **Microsoft Edge** (`channel: 'msedge'`) por defecto. La descarga de Chromium se atoraba
+  (servidor lento y disco C: casi lleno en la PC piloto). `AGENT_BROWSER=chrome|chromium` permite cambiarlo.
+- `LEEME.md`: sin `npx playwright install chromium`; aviso de no instalar dentro de OneDrive; cómo abrir el puerto 8080
+  en el firewall (ventana de administrador) y perfil de red Privada; no correr `npm audit fix --force`.
+
+### Cómo se probó
+- `Codigo.gs` con una hoja simulada de 1,000 filas: la versión anterior falla en Historial con error de rango;
+  la nueva pasa 1,600 tickets y 8,000 eventos y sigue actualizando tickets existentes.
+- `worker.js`: solo `node --check` (aquí no hay Edge). El propietario corrió `npm run agent:login` en Windows con Edge.
+
+### Estado de la PC piloto (laptop del propietario)
+- App en `D:\app` (fuera de OneDrive). Node instalado con winget. `npm install`, `npm run setup` y `agent:login` hechos.
+- Otros equipos de la red aún no abren `http://IP:8080`: falta crear la regla del firewall desde una ventana de administrador
+  (el primer intento se hizo sin elevación) y confirmar el perfil de red Privada.
+- `npm install` reporta 5 vulnerabilidades (1 moderada, 4 altas). Una conocida es de Playwright 1.47 al descargar navegadores
+  (ya no aplica con Edge). Falta revisar `npm audit` y decidir si se suben versiones.
+
+### Siguiente
+1. Regla de firewall + perfil Privada; probar desde otro equipo.
+2. Ticket de prueba real: datos del agente desde Bringgo/EasyShip y copia en la hoja (Tickets e Historial).
+3. Programador de tareas para los dos `.bat`; IP fija en el router; respaldo diario de `data\`.
+4. Si la PC de la bodega es otra, repetir la instalación allá.
+
 ## 2026-11-15 (9) · Claude Code · Copia a Google Sheets
 
 - `app/src/sheets-sync.js`: cada minuto envía los tickets que cambiaron (por hash) y los eventos nuevos al Apps Script de la hoja.

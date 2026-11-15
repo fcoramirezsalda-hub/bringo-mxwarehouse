@@ -1,7 +1,8 @@
 // Agente de búsqueda: atiende la cola enrichment_jobs y escribe la información de la orden en el ticket.
 //   npm run agent:login   Abre el navegador con ventana para que inicies sesión en Bringgo y EasyShip (una vez).
 //   npm run agent         Corre el agente sin ventana. Déjalo abierto durante el turno.
-// Variables opcionales: AGENT_FAKE=1 (datos de prueba, no abre navegador), HEADLESS=false, AGENT_PAUSE_MS=6000
+// Variables opcionales: AGENT_FAKE=1 (datos de prueba, no abre navegador), HEADLESS=false, AGENT_PAUSE_MS=6000,
+//   AGENT_BROWSER=msedge (por defecto, usa el Edge de Windows) | chrome | chromium (el que descarga Playwright)
 const path = require('path');
 const { open, DATA_DIR } = require('./db');
 const dm = require('./domain');
@@ -10,6 +11,8 @@ const PROFILE = process.env.AGENT_PROFILE || path.join(__dirname, '..', 'perfil-
 const CAPTURES = path.join(DATA_DIR, 'capturas-agente');
 const PAUSE = Number(process.env.AGENT_PAUSE_MS || 6000);
 const FAKE = process.env.AGENT_FAKE === '1';
+const BROWSER = process.env.AGENT_BROWSER || 'msedge';
+const CHANNEL = BROWSER === 'chromium' ? {} : { channel: BROWSER };
 
 function heartbeat(db, note) {
   db.prepare('INSERT INTO agent_heartbeat (id, at, note) VALUES (1,?,?) ON CONFLICT(id) DO UPDATE SET at=excluded.at, note=excluded.note').run(Date.now(), note || null);
@@ -83,7 +86,7 @@ async function main() {
   const db = open();
   if (process.argv.includes('--login')) {
     const { chromium } = require('playwright'); const c = require('./connectors');
-    const ctx = await chromium.launchPersistentContext(PROFILE, { headless: false, viewport: { width: 1400, height: 900 } });
+    const ctx = await chromium.launchPersistentContext(PROFILE, { ...CHANNEL, headless: false, viewport: { width: 1400, height: 900 } });
     (ctx.pages()[0] || await ctx.newPage()).goto(c.URLS.bringgoAccept);
     (await ctx.newPage()).goto(c.URLS.easyLookup);
     console.log('Inicia sesión en Bringgo y en EasyShip. Cuando veas las pantallas de búsqueda, cierra la ventana.');
@@ -94,7 +97,7 @@ async function main() {
   let page = null, lookupFn = fakeLookup;
   if (!FAKE) {
     const { chromium } = require('playwright'); const c = require('./connectors');
-    const ctx = await chromium.launchPersistentContext(PROFILE, { headless: process.env.HEADLESS !== 'false', viewport: { width: 1400, height: 900 } });
+    const ctx = await chromium.launchPersistentContext(PROFILE, { ...CHANNEL, headless: process.env.HEADLESS !== 'false', viewport: { width: 1400, height: 900 } });
     page = ctx.pages()[0] || await ctx.newPage(); lookupFn = c.lookup;
   }
   console.log(`Agente de búsqueda ${FAKE ? '(modo de prueba, sin navegador)' : ''} en marcha. Ctrl+C para detener.`);
