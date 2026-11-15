@@ -1,0 +1,16 @@
+{
+  "name": "wms-agente-busqueda-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prueba de concepto: busca órdenes en Bringgo y EasyShip en solo lectura",
+  "main": "poc.js",
+  "scripts": {
+    "login": "node poc.js login",
+    "mx": "node poc.js mx",
+    "guia": "node poc.js guia",
+    "es": "node poc.js es"
+  },
+  "dependencies": {
+    "playwright": "1.47.2"
+  }
+}

@@ -1,0 +1,1044 @@
+<title>MX Wharehouse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: consola de piso de bodega — barra lateral por rol, estación de escaneo para operadores, panel de tickets compartido Victor + Customer Service */
+:root{
+  --bg:#EDF0EE; --surface:#FFFFFF; --sunk:#E3E8E5; --ink:#17201D; --muted:#5A6762; --line:#D2D9D5;
+  --brand:#1E4F47; --brand-ink:#FFFFFF; --hi:#F2B01E; --hi-ink:#2A1D00;
+  --mx:#21995B; --es:#2F55C4;
+  --ok:#21804D; --warn:#AD6600; --bad:#BF3A2C; --info:#2E69AE;
+  --paper:#FFFFFF; --paper-ink:#111111;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1412; --surface:#171D1B; --sunk:#0B0F0D; --ink:#E3EAE7; --muted:#8F9D98; --line:#29322F;
+  --brand:#5FB3A3; --brand-ink:#08201B; --hi:#F5BC3A; --hi-ink:#2A1D00;
+  --mx:#43C682; --es:#7393F2; --ok:#4CC383; --warn:#E8A33A; --bad:#F06B5B; --info:#6AA6EA; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1412; --surface:#171D1B; --sunk:#0B0F0D; --ink:#E3EAE7; --muted:#8F9D98; --line:#29322F;
+  --brand:#5FB3A3; --brand-ink:#08201B; --hi:#F5BC3A; --hi-ink:#2A1D00;
+  --mx:#43C682; --es:#7393F2; --ok:#4CC383; --warn:#E8A33A; --bad:#F06B5B; --info:#6AA6EA; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:1.75rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
+p{margin:0}
+.mono{font-family:var(--f-mono);font-size:.86em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.84rem}
+.lbl{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.08em;font-size:.74rem;font-weight:600;color:var(--muted)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--hi);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100%}
+.side{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brandmark{display:flex;align-items:center;gap:10px;padding:18px 18px 14px}
+.brandmark .sq{width:30px;height:30px;border-radius:5px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px}
+.brandmark b{font-family:var(--f-display);font-size:1.15rem;line-height:1}
+.brandmark small{display:block;color:var(--muted);font-size:.75rem}
+.nav{display:flex;flex-direction:column;gap:2px;padding:6px 10px;overflow:auto;flex:1}
+.nav .grp{padding:14px 10px 4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:5px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:var(--sunk)}
+.nav a.on{background:color-mix(in oklab,var(--brand) 14%,var(--surface));box-shadow:inset 3px 0 0 var(--brand)}
+.nav a .cnt{margin-left:auto;background:var(--bad);color:#fff;border-radius:10px;font-size:.72rem;padding:1px 7px;font-weight:600}
+.nav a .cnt.n{background:var(--sunk);color:var(--muted)}
+.nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.printer{border-top:1px solid var(--line);padding:12px 18px;font-size:.82rem;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:12px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--surface)}
+.crumb{font-size:.88rem;color:var(--muted)} .crumb b{color:var(--ink);font-weight:600}
+.top .sp{flex:1}
+.clock{display:flex;align-items:center;gap:8px;font-size:.84rem;border:1px dashed var(--line);border-radius:5px;padding:4px 6px 4px 10px}
+.opsel{display:flex;align-items:center;gap:8px;font-size:.85rem}
+.rolechip{font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+select,input[type=text],input[type=search],textarea{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:7px 10px;min-width:0}
+textarea{width:100%;resize:vertical;min-height:80px}
+#view{padding-block:22px 48px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px;min-width:0}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:8px 14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.brand{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.ghost-danger{color:var(--bad);border-color:color-mix(in oklab,var(--bad) 50%,var(--line))}
+.btn.sm{padding:5px 10px;font-size:.85rem}
+.btn.link{border:0;background:none;padding:0;color:var(--info);text-decoration:underline;font-weight:600}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.done{border-color:var(--ok);color:var(--ok)}
+.btn.full{width:100%}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.panel-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.panel-h .sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:600;border-radius:4px;padding:2px 8px;white-space:nowrap}
+.chip.mx{background:color-mix(in oklab,var(--mx) 16%,var(--surface));color:var(--mx)}
+.chip.es{background:color-mix(in oklab,var(--es) 16%,var(--surface));color:var(--es)}
+.chip.ok{background:color-mix(in oklab,var(--ok) 15%,var(--surface));color:var(--ok)}
+.chip.warn{background:color-mix(in oklab,var(--warn) 16%,var(--surface));color:var(--warn)}
+.chip.bad{background:color-mix(in oklab,var(--bad) 14%,var(--surface));color:var(--bad)}
+.chip.info{background:color-mix(in oklab,var(--info) 15%,var(--surface));color:var(--info)}
+.chip.neutral{background:var(--sunk);color:var(--muted)}
+.chip.solid-bad{background:var(--bad);color:#fff}
+
+/* Escaneo */
+.scan-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.scanbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.scanrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.scaninput{flex:1 1 280px;font-family:var(--f-mono)!important;font-size:1.5rem!important;letter-spacing:.06em;padding:14px 16px!important;border:2px solid var(--line)!important}
+.scaninput:focus{border-color:var(--hi)!important;outline:none;box-shadow:0 0 0 4px color-mix(in oklab,var(--hi) 25%,transparent)}
+.samples{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center;font-size:.82rem}
+.sample{border:1px solid var(--line);background:var(--sunk);border-radius:4px;padding:3px 8px;cursor:pointer;font-size:.8rem}
+.sample:hover{border-color:var(--hi)}
+.empty{border:2px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--muted)}
+.empty h3{color:var(--ink);margin-bottom:6px}
+
+.banner{display:flex;gap:12px;align-items:flex-start;border-radius:var(--r);padding:12px 14px;border:1px solid}
+.banner b{display:block;font-family:var(--f-display);font-size:1.05rem;letter-spacing:.02em}
+.banner.warn{background:color-mix(in oklab,var(--warn) 10%,var(--surface));border-color:color-mix(in oklab,var(--warn) 45%,var(--line))}
+.banner.bad{background:color-mix(in oklab,var(--bad) 9%,var(--surface));border-color:color-mix(in oklab,var(--bad) 45%,var(--line))}
+.banner.info{background:color-mix(in oklab,var(--info) 9%,var(--surface));border-color:color-mix(in oklab,var(--info) 40%,var(--line))}
+.banner.ok{background:color-mix(in oklab,var(--ok) 9%,var(--surface));border-color:color-mix(in oklab,var(--ok) 40%,var(--line))}
+.banner .ic{font-family:var(--f-display);font-weight:700;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff}
+.banner.warn .ic{background:var(--warn)} .banner.bad .ic{background:var(--bad)} .banner.info .ic{background:var(--info)} .banner.ok .ic{background:var(--ok)}
+
+.order{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.order-head{display:grid;grid-template-columns:84px minmax(0,1fr);gap:16px;padding:16px}
+.thumb{width:84px;height:84px;border-radius:6px;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:1.5rem;background:color-mix(in oklab,hsl(var(--h) 55% 50%) 22%,var(--surface));color:hsl(var(--h) 45% 40%);border:1px solid var(--line)}
+.code{font-family:var(--f-mono);font-weight:600;font-size:1.15rem}
+.prod{font-weight:600;margin:4px 0 10px}
+.meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px 16px}
+.meta div{min-width:0} .meta .v{font-size:.9rem;overflow-wrap:anywhere}
+.order-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:14px 16px;border-top:1px solid var(--line);background:color-mix(in oklab,var(--sunk) 45%,var(--surface))}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.kv .full{grid-column:1/-1}
+
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.steps>li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.steps>li:first-child{border-top:0;padding-top:0}
+.stepn{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--muted)}
+li.cur .stepn{border-color:var(--hi);color:var(--ink);background:color-mix(in oklab,var(--hi) 20%,var(--surface))}
+li.done .stepn{border-color:var(--ok);background:var(--ok);color:#fff}
+.steps h3{margin-bottom:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.check{display:flex;gap:10px;align-items:center;cursor:pointer;font-weight:500}
+.check input{width:20px;height:20px;accent-color:var(--ok);flex:none}
+
+.zone{display:flex;gap:14px;align-items:center;border:1px dashed var(--line);background:color-mix(in oklab,var(--sunk) 45%,var(--surface));border-radius:var(--r);padding:10px 14px;flex-wrap:wrap}
+.zone .big{font-family:var(--f-display);font-weight:700;font-size:1.4rem;line-height:1}
+.zone .z2{color:var(--warn)} .zone .z1{color:var(--info)}
+.actbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding:14px 16px;background:color-mix(in oklab,var(--ok) 6%,var(--surface))}
+
+.probgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.prob{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.prob b{font-family:var(--f-display);font-size:1.05rem}
+.prob span{font-size:.82rem;color:var(--muted)}
+.prob:hover{border-color:var(--bad)}
+.prob.on{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.file{border:1px dashed var(--line);border-radius:5px;padding:10px;font-size:.85rem;display:flex;flex-direction:column;gap:6px;min-width:0}
+.file input{max-width:100%}
+
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th{text-align:left;font-family:var(--f-display);text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.pick td{background:color-mix(in oklab,var(--ok) 8%,var(--surface))}
+tr.click{cursor:pointer} tr.click:hover td{background:color-mix(in oklab,var(--hi) 9%,var(--surface))}
+tr.late td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+tr.soon td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+tr:last-child td{border-bottom:0}
+
+.side-col{display:flex;flex-direction:column;gap:14px}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.feed li{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:.85rem}
+.feed li:first-child{border-top:0}
+.feed .t{font-family:var(--f-mono);font-size:.74rem;color:var(--muted);padding-top:2px}
+.tree{font-size:.84rem;display:flex;flex-direction:column;gap:6px}
+.tree div{display:grid;grid-template-columns:auto 1fr;gap:8px}
+
+/* Tablero */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-family:var(--f-display);font-weight:700;font-size:2.1rem;line-height:1.05}
+.kpi .s{font-size:.8rem;color:var(--muted)}
+.kpi.hl{border-color:var(--hi);box-shadow:inset 0 3px 0 var(--hi)}
+.bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:4px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.hbars{display:flex;flex-direction:column;gap:9px}
+.hb{display:grid;grid-template-columns:170px minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:.86rem}
+.hb .bar{height:12px}
+.hb .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+
+/* Tickets */
+.filtersbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.filtersbar .field{flex:1 1 150px}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start}
+.tk-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.tk-head .code{font-size:1.4rem}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 16px}
+.facts div{min-width:0}
+.facts .v{overflow-wrap:anywhere}
+.mgmt{display:flex;flex-direction:column;gap:0}
+.mgmt section{padding:14px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.mgmt section:first-child{border-top:0;padding-top:0}
+.owner{display:flex;align-items:center;gap:10px}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;background:var(--sunk);color:var(--ink);flex:none}
+.av.on{background:var(--brand);color:var(--brand-ink)}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;flex-wrap:wrap}
+.tabs button{border:0;background:var(--surface);padding:7px 14px;cursor:pointer;font-weight:600}
+.tabs button.on{background:var(--brand);color:var(--brand-ink)}
+.chat{display:flex;flex-direction:column;gap:10px}
+.msg{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--surface);max-width:620px}
+.msg.mine{align-self:flex-end;background:color-mix(in oklab,var(--brand) 8%,var(--surface))}
+.msg .mh{display:flex;gap:8px;align-items:center;font-size:.8rem;color:var(--muted);margin-bottom:4px;flex-wrap:wrap}
+.msg img{max-width:220px;border-radius:4px;margin-top:6px;display:block}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:.88rem}
+.timeline li:first-child{border-top:0}
+.evgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.ev{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface);font-size:.78rem}
+.ev .im{aspect-ratio:4/3;max-width:100%;background:var(--sunk);display:grid;place-items:center;color:var(--muted);font-family:var(--f-display);font-weight:700}
+.ev .im img{width:100%;height:100%;object-fit:cover;display:block}
+.ev .cap{padding:6px 8px}
+.confirmbox{border:1px solid color-mix(in oklab,var(--bad) 45%,var(--line));background:color-mix(in oklab,var(--bad) 6%,var(--surface));border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.countdown{display:flex;gap:10px;align-items:center}
+.countdown .bar{flex:1;height:10px}
+
+/* Despacho */
+.gaylords{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.gl{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.gl .tank{height:70px;border:2px solid var(--line);border-top:0;border-radius:0 0 6px 6px;position:relative;overflow:hidden;background:var(--sunk)}
+.gl .tank i{position:absolute;left:0;right:0;bottom:0;background:color-mix(in oklab,var(--info) 55%,var(--surface))}
+.gl .tank i.full{background:color-mix(in oklab,var(--warn) 65%,var(--surface))}
+.gl b{font-family:var(--f-display);font-size:1.05rem}
+.gl.flash{border-color:var(--hi);box-shadow:0 0 0 3px color-mix(in oklab,var(--hi) 30%,transparent)}
+
+/* Equipo */
+.team{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.mate{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.mate .who{display:flex;gap:10px;align-items:center}
+.mate.lead{border-color:var(--brand)}
+.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stats3 div{background:var(--sunk);border-radius:4px;padding:6px 8px}
+.stats3 b{font-family:var(--f-display);font-size:1.25rem;display:block;line-height:1.1}
+.stats3 span{font-size:.72rem;color:var(--muted)}
+.yes{color:var(--ok);font-weight:700} .no{color:var(--muted)}
+
+/* Modal etiqueta */
+.overlay{position:fixed;inset:0;background:color-mix(in oklab,#000 55%,transparent);display:grid;place-items:center;z-index:50;padding:16px}
+.modal{background:var(--surface);border-radius:8px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+.labels{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.label4x6{background:var(--paper);color:var(--paper-ink);width:280px;max-width:100%;aspect-ratio:4/6;border:1px solid #bbb;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:12px;display:flex;flex-direction:column;gap:8px;font-family:var(--f-body);font-size:11px;line-height:1.3}
+.label4x6 .lh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--paper-ink);padding-bottom:6px}
+.label4x6 .car{font-family:var(--f-display);font-weight:700;font-size:20px;line-height:1}
+.label4x6 .bc svg{width:100%;height:58px;display:block}
+.label4x6 .trk{font-family:var(--f-mono);font-size:12px;text-align:center;letter-spacing:.05em}
+.label4x6 .box{border:1.5px solid var(--paper-ink);padding:6px}
+.label4x6 .big{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1}
+#toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:6px;max-width:min(440px,calc(100vw - 32px));font-size:.9rem;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+
+@media (max-width:1180px){.detail{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1080px){.scan-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .nav{flex-direction:row;overflow-x:auto;padding:0 10px 10px}
+  .nav .grp{display:none}
+  .nav a{white-space:nowrap}
+  .printer{display:none}
+  .brandmark{padding:12px 16px 8px}
+  .top,#view{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .order-cols{grid-template-columns:minmax(0,1fr)}
+  .hb{grid-template-columns:110px minmax(0,1fr) 36px}
+  .timeline li{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:480px){.order-head{grid-template-columns:minmax(0,1fr)} .scaninput{font-size:1.15rem!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<style>
+/* Registro de incidencias: tarjetas de paso */
+.reg{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.stepcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.stepcard.cur{border-color:var(--hi);box-shadow:inset 0 3px 0 var(--hi)}
+.stepcard.done{border-color:color-mix(in oklab,var(--ok) 45%,var(--line))}
+.stepcard.locked{opacity:.55}
+.stephead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stephead .sp{flex:1}
+.stepcard.done .stepn{border-color:var(--ok);background:var(--ok);color:#fff}
+.stepcard.cur .stepn{border-color:var(--hi);color:var(--ink);background:color-mix(in oklab,var(--hi) 20%,var(--surface))}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.84rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.codeinput{font-family:var(--f-mono)!important;font-size:1.25rem!important;letter-spacing:.05em;text-transform:uppercase;flex:1 1 200px}
+.err{color:var(--bad);font-weight:600;font-size:.9rem}
+.typegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.type{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.type b{font-family:var(--f-display);font-size:1.1rem}
+.type .act{font-size:.82rem;color:var(--muted)}
+.type:hover{border-color:var(--ink)}
+.type.on{border-color:var(--hi);box-shadow:inset 0 0 0 2px var(--hi)}
+.type.feat{grid-column:1/-1;flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap;border:2px solid var(--hi);background:color-mix(in oklab,var(--hi) 12%,var(--surface));padding:14px 16px}
+.type.feat b{font-size:1.3rem}
+.type.on{background:color-mix(in oklab,var(--hi) 22%,var(--surface))}
+.type.feat.on{box-shadow:inset 0 0 0 2px var(--hi)}
+.dest{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.8rem;border-radius:4px;padding:3px 9px;background:color-mix(in oklab,var(--brand) 14%,var(--surface));color:var(--brand)}
+.dest.pend{background:color-mix(in oklab,var(--warn) 16%,var(--surface));color:var(--warn)}
+.dest.esc{background:color-mix(in oklab,var(--bad) 14%,var(--surface));color:var(--bad)}
+.ident{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;align-items:center}
+.ident .thumb{width:56px;height:56px;font-size:1.1rem}
+.missing{margin:0;padding-left:18px;font-size:.86rem;color:var(--warn)}
+.regfoot{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+.kvlist{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:.9rem}
+.kvlist dt{color:var(--muted)} .kvlist dd{margin:0;overflow-wrap:anywhere}
+@media (max-width:1080px){.reg{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro · versión de prueba</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="printer" title="El agente corre en una PC de la bodega. Si se apaga, las búsquedas esperan en cola."><span class="dot"></span> Agente de búsqueda · PC bodega en línea</div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumb" id="crumb"></div>
+      <div class="sp"></div>
+      <div class="clock" title="Reloj simulado para probar plazos y vencimientos"><span class="lbl">Reloj de prueba</span><b id="clk" class="num"></b><button class="btn sm" data-a="fast" title="Adelanta 3 minutos para ver llegar la información del agente">+3 min</button><button class="btn sm" data-a="tick">+1 día</button></div>
+      <label class="opsel" for="op"><span class="lbl">Sesión</span><select id="op"></select><span class="rolechip" id="rolechip"></span></label>
+    </header>
+    <main id="view"></main>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+/* =====================================================================
+   MAQUETA — todo vive en memoria del navegador. La plataforma empieza en
+   "2. Incidencias" del flujo: el escaneo correcto sigue en Bringgo/EasyShip.
+   En el sistema real, permisos, toma atómica y vencimientos van en backend.
+   ===================================================================== */
+const H=3600e3, D=24*H;
+let NOW=new Date('2026-11-15T11:00:00').getTime();
+
+/* ---------- Usuarios y permisos ---------- */
+const ALLP=['take','transfer','resolve','confirmdup','discard','restore','dispose','users'];
+const USERS=[
+ {n:'Fatima',role:'op',r:'Procesadora de paquetes'},{n:'Mauricio',role:'op',r:'Procesador de paquetes'},
+ {n:'Aracely',role:'op',r:'Procesadora de paquetes'},{n:'Michelle',role:'op',r:'Procesadora de paquetes'},
+ {n:'Josue',role:'op',r:'Retornos y apoyo'},{n:'Adrian',role:'op',r:'Retornos y apoyo'},
+ {n:'Victor',role:'admin',dept:'Procesamiento',r:'Resuelve incidencias',perms:['take','transfer','resolve','confirmdup','discard','restore','dispose']},
+ {n:'Francisco R.',role:'admin',dept:'Customer Service',r:'Customer Service · administrador del sistema',perms:ALLP},
+ {n:'Samantha M.',role:'admin',dept:'Customer Service',r:'Customer Service',perms:['take','resolve','confirmdup']},
+ {n:'Pamela V.',role:'admin',dept:'Customer Service',r:'Customer Service',perms:['take','resolve','confirmdup']},
+ {n:'Rachel',role:'admin',dept:'Customer Service',r:'Customer Service',perms:['take','resolve','confirmdup']}];
+const PERM_LABEL={take:'Tomar ticket',transfer:'Transferir / liberar tickets de otros',resolve:'Resolver',confirmdup:'Confirmar duplicado',discard:'Descartar incidencia',restore:'Restaurar descartada',dispose:'Confirmar Dispose realizado',users:'Administrar usuarios y permisos'};
+const BASE={Mauricio:{i:7},Fatima:{i:9},Aracely:{i:6},Michelle:{i:8},Josue:{i:2,ret:31},Adrian:{i:1,ret:27}};
+const U=()=>USERS.find(u=>u.n===S.op);
+const isAdmin=()=>U().role==='admin';
+const can=p=>isAdmin()&&U().perms.includes(p);
+function need(p){if(can(p))return true;toast(`Tu usuario no tiene permiso para: <b>${PERM_LABEL[p]||p}</b>.`);return false;}
+const DEPTS=['Bringgo','EasyShip','Equipo turco','Vendedor Amazon','Murat (Laredo)','Customer Service','Procesamiento'];
+
+/* ---------- Tipos de incidencia (tabla "2. Incidencias") ---------- */
+const TYPES={
+ producto:{l:'Sin producto o diferente',act:'Fotos de producto y caja + mensaje en plataforma',dest:'Pendiente de resolución',dk:'pend'},
+ danado:{l:'Dañado o con escurrimiento',act:'Re-empacar y enviar',dest:'Enviado con paquetería',dk:''},
+ inbound:{l:'Guía no reconocida',act:'Corregir número → Reetiquetar',dest:'Despacho',dk:''},
+ extradept:{l:'Extra Dept',act:'Comparar costos → Elegir menor costo → Imprimir guía',dest:'Despacho',dk:''},
+ sinetiqueta:{l:'Sin etiqueta',act:'Item Look Up por nombre · si aparece: MX disponible + guía · si no: escalar con Murat, Laredo',dest:'Despacho o escalar',dk:''},
+ nouse:{l:'No use label',act:'Generar o reimprimir guía mexicana',dest:'Despacho',dk:''},
+ duplicado:{l:'Duplicado',act:'Misma guía americana para el mismo MX/ES · asignar a orden sin guía o escalar',dest:'Despacho o escalar',dk:''},
+ otro:{l:'Otro',act:'',dest:'',dk:''},
+ retorno:{l:'Retorno',act:'Paquete devuelto por la paquetería',dest:'Área de retornos',dk:''}};
+const REG_TYPES=['inbound','producto','danado','extradept','sinetiqueta','nouse','duplicado','otro'];
+const CLOSED=['Resuelto','Resuelto en piso','Enviado dañado','Dispose realizado','Descartado'];
+const isOpen=t=>!CLOSED.includes(t.status);
+const QUOTES=[['J&T','J&T Express',79.50],['Estafeta','Estafeta Terrestre',88.10],['PaqueteExpress','PQEX Standard',92.40],['FedEx','FedEx Nacional Económico',131.00],['DHL','DHL Express Nacional',210.00]];
+
+/* ---------- Conector de ejemplo (datos ficticios; integración real sin verificar) ---------- */
+const BAD_TRK='1Z999AA10123456784';
+
+/* ---------- Agente de búsqueda (simulado) ----------
+   Después del registro consulta, en solo lectura:
+   · MX  → Bringgo "Accept goods"
+   · Guía mexicana (outbound) → Bringgo "Item Look Up" por outbound tracking number
+   · ES o guía ES → EasyShip "Item lookup"
+   y escribe la información de la orden en el ticket. Demora 2–3 min. */
+const od=(code,product,asin,city,carrier,out,inbound,date,h)=>{const n=code.replace(/\D/g,'');return {code,plat:code.slice(0,2),product,asin,qty:1,city,carrier,out,inbound,date,h,
+  cust:'Cliente demo (BRG'+n.slice(-4)+')',seller:'701-'+n.padStart(7,'4').slice(-7)+'-'+n.slice(-3)+'4417',buyer:'114-'+n.slice(-5)+'10-'+n.slice(-4)+'650',
+  ord:'#44'+n.slice(-5),ost:out?(date<'2026-11-05'?'Delivered':'In transit'):'Sin guía'}};
+const CONN={
+ accept:{
+  'MX-3015532':od('MX-3015532','Hydro Flask 32 oz Wide Mouth','B083GBK6S2','Querétaro, Qro.','DHL','4419920013','1Z999AA10123456748','2026-11-09',200),
+  'MX-3017755':od('MX-3017755','Sony WH-1000XM5 – Audífonos inalámbricos','B09XS7JWHH','Tijuana, BC','PaqueteExpress','191257610038','9361289717370288014455','2026-11-10',260),
+  'MX-2958810':od('MX-2958810','Sony WF-1000XM5 – Audífonos in-ear','B0C33XXS56','Guadalajara, Jal.','PaqueteExpress','191257380015','9361289717370210044421','2026-11-04',250),
+  'MX-3016102':od('MX-3016102','Instant Pot Duo 7-en-1, 6 qt','B00FLYWNYQ','Puebla, Pue.','FedEx','879506330218','9405511206213845911123','2026-11-09',15),
+  'MX-3013307':od('MX-3013307','Bose QuietComfort Ultra Earbuds','B0C1KZ6Q3X','León, Gto.','PaqueteExpress','879506220187','TBA318820045777','2026-11-05',280),
+  'MX-3002210':od('MX-3002210','Kindle Paperwhite 16 GB','B0CFPJYX7P','Monterrey, NL','Estafeta','8055401188','1ZY49F950301120044','2026-10-30',210),
+  'MX-3009981':od('MX-3009981','Owala FreeSip 24 oz','B0BZYCJK89','Hermosillo, Son.','J&T','JT0091198812','9361289717370200911002','2026-11-02',170),
+  'MX-3008120':od('MX-3008120','Philips Sonicare 4100','B078GVDB19','Mérida, Yuc.','PaqueteExpress','191257220931','9405511206213800812001','2026-11-01',190),
+  'MX-3004415':od('MX-3004415','CeraVe Loción hidratante 19 oz','B000YJ2SLG','Toluca, Edo. Méx.','PaqueteExpress','191257110455','TBA318820041190','2026-10-31',40),
+  'MX-3011450':od('MX-3011450','Apple AirTag – Paquete de 4','B0D54JZTHY','Mérida, Yuc.','J&T','JT0091220331','TBA318820045123','2026-11-06',0),
+  'MX-3018840':od('MX-3018840','Stanley Quencher H2.0 FlowState 40 oz','B0CJZMP7L1','CDMX','PaqueteExpress','191257602214','420782209261290321690','2026-11-11',190),
+  'MX-3016001':od('MX-3016001','Ninja AF101 Air Fryer 4 qt','B07FDJMC9Q','Zapopan, Jal.','—',null,'9405511206213845900021','2026-11-09',0)},
+ outbound:{'191257610038':'MX-3017755','4419920013':'MX-3015532','879506330218':'MX-3016102','191257602214':'MX-3018840','879506220187':'MX-3013307'},
+ easy:{
+  'ES-118412':od('ES-118412','Olaplex No. 3 Hair Perfector 100 ml','B00SNM5US4','León, Gto.','Estafeta','8055420177','1ZY49F950309917742','2026-11-11',320),
+  'ES-118290':od('ES-118290','JBL Flip 6 – Bocina Bluetooth','B09GJVTRNZ','Culiacán, Sin.','iMile','6120004417','9361289717370255080114','2026-11-07',30),
+  'ES-118120':od('ES-118120','Logitech MX Master 3S','B09HM94VDS','Saltillo, Coah.','Estafeta','8055399012','1ZY49F950305512210','2026-11-03',230),
+  'ES-117880':od('ES-117880','Anker PowerCore 20000','B07S829LBX','Chihuahua, Chih.','iMile','6120003355','9361289717370221188003','2026-10-28',220),
+  'ES-118377':od('ES-118377','The Ordinary Niacinamide 10%','B06VSX2B1S','Morelia, Mich.','Estafeta','8055411873','1ZY49F950307730021','2026-11-12',300),
+  'ES-117911':od('ES-117911','Crocs Classic Clog','B0014C2NBC','Aguascalientes, Ags.','Estafeta','8055392206','1ZY49F950300041177','2026-10-29',10)},
+ canceled:{'191257009911':'MX-3016001'},
+ easyTrk:{'8055420177':'ES-118412','1ZY49F950309917742':'ES-118412','6120004417':'ES-118290'}};
+const srcFor=t=>t.code&&t.code!=='—'?(t.code.startsWith('MX')?'Bringgo · Accept goods':'EasyShip · Item lookup'):'Bringgo · Item Look Up (outbound, inbound y cancelada) y EasyShip · Item lookup';
+function agentSearch(t){
+  const tried=[];
+  if(t.code&&t.code!=='—'){
+    if(t.code.startsWith('MX')){tried.push('Bringgo · Accept goods');const d=CONN.accept[t.code];if(d)return {d,src:'Bringgo · Accept goods',tried};}
+    else{tried.push('EasyShip · Item lookup');const d=CONN.easy[t.code];if(d)return {d,src:'EasyShip · Item lookup',tried};}
+  }
+  if(t.trk){
+    tried.push('Bringgo · Item Look Up (Outbound Tracking Number)');let c=CONN.outbound[t.trk];if(c)return {d:CONN.accept[c],src:'Bringgo · Item Look Up · Outbound Tracking Number',tried};
+    tried.push('Bringgo · Item Look Up (Inbound Tracking Number)');c=Object.keys(CONN.accept).find(k=>CONN.accept[k].inbound===t.trk);if(c)return {d:CONN.accept[c],src:'Bringgo · Item Look Up · Inbound Tracking Number',tried};
+    tried.push('Bringgo · Item Look Up (Canceled Tracking Number)');c=CONN.canceled[t.trk];if(c)return {d:CONN.accept[c],src:'Bringgo · Item Look Up · Canceled Tracking Number',tried};
+    tried.push('EasyShip · Item lookup');c=CONN.easyTrk[t.trk];if(c)return {d:CONN.easy[c],src:'EasyShip · Item lookup',tried};
+  }
+  return {d:null,tried};
+}
+function queueEnrich(t){
+  if((!t.code||t.code==='—')&&!t.trk){t.enr={st:'na'};return;}
+  t.enr={st:'buscando',q:NOW,ready:NOW+(120+Math.floor(Math.random()*60))*1000};
+}
+function runAgent(){
+  let n=0;
+  for(const t of S.tickets){
+    const e=t.enr; if(!e||e.st!=='buscando'||NOW<e.ready)continue;
+    const r=agentSearch(t), at=e.ready; e.tried=r.tried; e.at=at;
+    if(r.d){e.st='lista';e.src=r.src;e.d=r.d;if(!t.code||t.code==='—')t.code=r.d.code;t.plat=r.d.plat;t.history.push({at,who:'Agente de búsqueda',text:'Información de la orden obtenida de '+r.src});}
+    else{e.st='sin';t.history.push({at,who:'Agente de búsqueda',text:'Sin coincidencias en '+r.tried.join(', ')});}
+    S.agentLog.unshift({at,id:t.id,ok:!!r.d});n++;
+  }
+  return n;
+}
+const mmss=ms=>{ms=Math.max(0,ms);return `${Math.floor(ms/60000)} min ${String(Math.floor(ms%60000/1000)).padStart(2,'0')} s`};
+const idl=t=>t.code&&t.code!=='—'?t.code:(t.trk||'—');
+function enrChip(t){const st=t.enr?.st;return st==='buscando'?'<span class="chip info">Buscando…</span>':st==='lista'?'<span class="chip ok">Lista</span>':st==='sin'?'<span class="chip bad">Sin coincidencias</span>':'<span class="muted">—</span>';}
+function orderPanel(t){
+  const e=t.enr||{st:'na'}, h=`<div class="panel-h"><h3>Información de la orden</h3><span class="sp"></span>`;
+  if(e.st==='buscando')return `<section class="panel">${h}<span class="chip info">Buscando</span></div>
+    <p class="small">El agente de búsqueda está consultando <b>${esc(srcFor(t))}</b>. Llega en <b data-eta="${e.ready}">~${mmss(e.ready-NOW)}</b>.</p>
+    <p class="muted small" style="margin-top:4px">En cola desde ${fdt(e.q)}. Puedes trabajar el ticket mientras tanto; la información aparece sola.</p></section>`;
+  if(e.st==='lista'){const d=e.d, br=e.src.startsWith('Bringgo'), acc=e.src.includes('Accept goods');
+    const rows=br?[['Usuario (cliente Bringgo)',esc(d.cust)],['W.H code',`<span class="mono">${d.code}</span>`],['ASIN',`<span class="mono">${d.asin}</span>`],['Product quantity',d.qty],['Seller account order no',`<span class="mono">${d.seller}</span>`],['Buyer order ID',`<span class="mono">${d.buyer}</span>`],['Outbound tracking',d.out?`<span class="mono">${d.out}</span> · ${esc(d.carrier)} · ${esc(d.ost)}`:'Sin guía mexicana'],['Inbound tracking',`<span class="mono">${esc(d.inbound||'—')}</span>`],['Creado',d.date],...(acc?[['Destino (Recipient address)',esc(d.city)]]:[])]
+      :[['Orden EasyShip',`<span class="mono">${d.ord}</span> · ${esc(d.ost)}`],['Código',`<span class="mono">${d.code}</span>`],['ASIN',`<span class="mono">${d.asin}</span>`],['Tracking ID',`<span class="mono">${d.out||'—'}</span>`],['Seller order',`<span class="mono">${d.seller}</span>`],['Buyer order',`<span class="mono">${d.buyer}</span>`],['Buyer tracking',`<span class="mono">${esc(d.inbound||'—')}</span>`]];
+    return `<section class="panel">${h}<span class="chip ok">${esc(e.src)}</span></div>
+    <div class="ident"><div class="thumb" style="--h:${d.h}">${initials(d.product)}</div><div style="min-width:0"><div class="row"><span class="code">${d.code}</span>${platChip(d.plat)}</div><b>${esc(d.product)}</b></div></div>
+    <dl class="kvlist" style="margin-top:12px">${rows.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+    <p class="muted small" style="margin-top:8px">Obtenida por el agente de búsqueda con la cuenta de ${esc(S.agentAccount)} · ${fdt(e.at)} · solo lectura, no modifica nada en ${platName(d.plat)}.</p></section>`;}
+  const box=`<div class="row" style="margin-top:10px"><input type="text" id="recode" class="mono" placeholder="MX-0000000, ES-000000 o guía mexicana" style="flex:1 1 200px"><button class="btn" data-a="research">Buscar de nuevo</button></div>`;
+  if(e.st==='sin')return `<section class="panel">${h}<span class="chip bad">Sin coincidencias</span></div>
+    <p class="small">Se buscó en: ${esc((e.tried||[]).join(', '))} (${fdt(e.at)}).</p>${box}<p class="muted small" style="margin-top:6px">Si identificas el MX/ES o una guía mexicana, agrégalo. La nueva búsqueda tarda 2–3 min.</p></section>`;
+  return `<section class="panel">${h}</div><p class="small muted">Sin código ni guía: el agente no puede buscar todavía.</p>${box}</section>`;
+}
+
+/* ---------- Tickets de ejemplo ---------- */
+let seq=420;
+function mk(o){const t={id:o.id,trk:o.trk||null,code:o.code,plat:o.plat,type:o.type,created:NOW+o.c,reporter:o.rep,dept:'Operación',ev:o.ev||[],status:o.st||'Abierto',owner:o.owner||null,waiting:o.w||null,loc:o.loc||'',history:[],chat:o.chat||[],chatOpen:!!(o.chat&&o.chat.length),due:NOW+o.c+3*D,assign:[],note:o.note,resolution:o.res||null,dmg:o.dmg||null,dupConfirmed:null,dupDue:null,flags:{},reg:o.reg||null};
+  t.history.push({at:t.created,who:o.rep,text:'Registró la incidencia: '+o.note});
+  if(o.owner){const at=t.created+2*H;t.assign.push({at,who:o.owner,a:'Tomó el ticket'});t.history.push({at,who:o.owner,text:'Tomó el ticket'});}
+  if(o.w)t.history.push({at:t.created+3*H,who:o.owner||'Victor',text:'Esperando respuesta de '+o.w});
+  if(o.dup){t.dupConfirmed={at:NOW+o.dup,who:o.owner};t.dupDue=NOW+o.dup+10*D;t.history.push({at:NOW+o.dup,who:o.owner,text:'Confirmó mercancía duplicada · inicia plazo de 10 días'});}
+  if(o.res)t.history.push({at:t.created+(o.st==='Resuelto en piso'?0:20*H),who:o.owner||o.rep,text:(o.st==='Resuelto en piso'?'Resuelto en piso: ':'Resolvió: ')+o.res});
+  return t;}
+const ph=(name,by,at)=>({name,src:null,by,at});
+const S={view:'registro',op:'Fatima',R:null,last:null,sel:null,tab:'chat',pend:{},ui:{},
+ fl:{st:'abiertos',owner:'todos',orig:'todos',venc:'todos',type:'todos'},
+ counts:{producto:9,danado:7,inbound:6,extradept:5,sinetiqueta:4,nouse:6,duplicado:8,otro:2},session:{},
+ log:[],agentLog:[],disposeLog:[],jobRuns:[],tickets:[],
+ accounts:{'Francisco R.':{bringgo:true,easy:true}},agentAccount:'Francisco R.',
+ returns:[
+  {at:NOW-16*60e3,trk:'MX-2940012',why:'Destinatario rechazó',who:'Josue',car:'PaqueteExpress',tk:null},
+  {at:NOW-40*60e3,trk:'MX-2931870',why:'Domicilio no localizado',who:'Adrian',car:'Estafeta',tk:null},
+  {at:NOW-65*60e3,trk:'ES-117402',why:'Paquete dañado en ruta',who:'Josue',car:'FedEx',tk:null}]};
+S.tickets=[
+ mk({id:'INC-0419',code:'MX-3016102',plat:'MX',type:'producto',c:-1*H,rep:'Michelle',note:'Caja vacía; solo trae relleno',loc:'Mesa de incidencias',w:'Bringgo',st:'Abierto',
+   ev:[ph('Producto / contenido','Michelle',NOW-1*H),ph('Caja y etiqueta','Michelle',NOW-1*H)],reg:{src:'Escaneado',dest:'Pendiente de resolución',fields:[['Mensaje en plataforma','Sí, en Bringgo']]}}),
+ mk({id:'INC-0416',code:'ES-118290',plat:'ES',type:'duplicado',c:-26*H,rep:'Aracely',note:'EasyShip muestra selección de paquetería y autorización',loc:'Rack duplicados',ev:[ph('Paquete','Aracely',NOW-26*H)],reg:{src:'Escaneado',dest:'Escalar · rack de duplicados',fields:[['Resultado en EasyShip','Selección de paquetería y autorización']]}}),
+ mk({id:'INC-0412',code:'MX-2958810',plat:'MX',type:'producto',c:-51*H,rep:'Mauricio',note:'Llegó funda de celular; la orden es de audífonos',owner:'Victor',w:'Bringgo',st:'Esperando respuesta',loc:'Anaquel incidencias A-03',
+   ev:[ph('Producto recibido','Mauricio',NOW-51*H),ph('Caja y etiqueta','Mauricio',NOW-51*H)],
+   chat:[{at:NOW-48*H,who:'Victor',tag:'Mensaje',text:'Ya se dejó el mensaje en Bringgo con las 2 fotos. Queda apartado en A-03.'},{at:NOW-30*H,who:'Rachel',tag:'Instrucción del vendedor Amazon',text:'El vendedor confirma error de surtido. Pide esperar a que generen nueva orden; no despachar todavía.'}],
+   reg:{src:'Tecleado a mano (tracking ilegible)',dest:'Pendiente de resolución',fields:[['Mensaje en plataforma','Sí, en Bringgo']]}}),
+ mk({id:'INC-0414',code:'—',plat:'MX',type:'sinetiqueta',c:-75*H,rep:'Aracely',note:'Sin etiqueta; lámpara LED de escritorio; no aparece en Item Look Up',owner:'Victor',w:'Murat (Laredo)',st:'Esperando respuesta',loc:'Anaquel incidencias A-01',ev:[ph('Contenido','Aracely',NOW-75*H)],reg:{src:'Sin etiqueta',dest:'Escalado con Murat (Laredo)',fields:[['Descripción','Lámpara LED de escritorio negra'],['¿Apareció en Item Look Up?','No']]}}),
+ mk({id:'INC-0415',code:'MX-3013307',plat:'MX',type:'duplicado',c:-6*D,rep:'Michelle',note:'Sin orden disponible para ASIN B0C1KZ6Q3X',owner:'Samantha M.',w:'Vendedor Amazon',st:'Esperando respuesta',loc:'Rack duplicados D-02',dup:-5*D-20*H}),
+ mk({id:'INC-0409',code:'ES-118120',plat:'ES',type:'duplicado',c:-10*D-6*H,rep:'Fatima',note:'Segundo paquete con la misma guía americana',owner:'Victor',st:'En gestión',loc:'Rack duplicados D-01',dup:-10*D+5*H}),
+ mk({id:'INC-0401',code:'MX-3002210',plat:'MX',type:'duplicado',c:-14*D,rep:'Mauricio',note:'Duplicado sin orden libre',owner:'Victor',st:'En gestión',loc:'Rack duplicados D-04',dup:-12*D}),
+ mk({id:'INC-0398',code:'ES-117880',plat:'ES',type:'duplicado',c:-16*D,rep:'Fatima',note:'Duplicado ES sin orden libre',owner:'Francisco R.',st:'En gestión',loc:'Rack duplicados D-03',dup:-15*D}),
+ mk({id:'INC-0413',code:'ES-118377',plat:'ES',type:'danado',c:-30*H,rep:'Fatima',note:'Escurrimiento; re-empacado y enviado',st:'Enviado dañado',dmg:'Pendiente'}),
+ mk({id:'INC-0407',code:'MX-3008120',plat:'MX',type:'danado',c:-6*D,rep:'Mauricio',note:'Caja aplastada; re-empacado y enviado',st:'Enviado dañado',dmg:'Regresó'}),
+ mk({id:'INC-0402',code:'MX-3004415',plat:'MX',type:'danado',c:-9*D,rep:'Michelle',note:'Escurrimiento de líquido; re-empacado y enviado',st:'Enviado dañado',dmg:'Dispose de paquetería'}),
+ mk({id:'INC-0399',code:'ES-117911',plat:'ES',type:'danado',c:-12*D,rep:'Aracely',note:'Esquina rota; re-empacado y enviado',st:'Enviado dañado',dmg:'Entregado'}),
+ mk({id:'INC-0411',code:'MX-3015532',plat:'MX',type:'inbound',c:-5*H,rep:'Mauricio',note:'Inbound con dígitos invertidos',st:'Resuelto en piso',res:'Inbound corregido de 1Z999AA10123456748 a 1Z999AA10123456784 y reetiquetado · Despacho',reg:{src:'Tecleado a mano',dest:'Despacho',fields:[['Capturado en plataforma','1Z999AA10123456748'],['Número correcto','1Z999AA10123456784'],['Corregido en plataforma','Sí'],['Reetiquetado','Sí']]}}),
+ mk({id:'INC-0405',code:'MX-3009981',plat:'MX',type:'producto',c:-4*D,rep:'Michelle',note:'Producto distinto',owner:'Victor',st:'En gestión'}),
+];
+(()=>{const t=S.tickets.find(x=>x.id==='INC-0398');t.status='Dispose realizado';t.flags.dispose=true;
+ const at=t.dupDue;t.history.push({at,who:'Proceso programado',text:'Plazo de 10 días cumplido → Dispose programado'});
+ t.ev.push(ph('Evidencia de disposición','Francisco R.',at+20*H));t.history.push({at:at+20*H,who:'Francisco R.',text:'Confirmó Dispose realizado con evidencia'});
+ S.disposeLog.push({id:t.id,code:t.code,at,done:at+20*H});
+ const d=S.tickets.find(x=>x.id==='INC-0405');d.prevStatus='En gestión';d.status='Descartado';d.discard={at:NOW-3*D,who:'Victor',why:'El operador tecleó el MX equivocado; el producto sí coincide con su orden.'};d.history.push({at:NOW-3*D,who:'Victor',text:'Descartó la incidencia: '+d.discard.why});
+ S.log=[{at:NOW-60*60e3,who:'Michelle',x:'Registró INC-0419 Sin producto o diferente · MX-3016102'},{at:NOW-5*H,who:'Mauricio',x:'Registró INC-0411 Guía no reconocida · resuelto en piso'},{at:NOW-26*H,who:'Aracely',x:'Registró INC-0416 Duplicado · ES-118290'}];
+ S.tickets.forEach(t=>{queueEnrich(t);if(t.enr.st==='buscando'){t.enr.q=t.created;t.enr.ready=t.created+150000;}});
+ const n=S.tickets.find(x=>x.id==='INC-0419');n.enr.q=NOW-60000;n.enr.ready=NOW+75000;
+ runAgent();})();
+
+/* ---------- Utilidades ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+Number(n).toFixed(2);
+const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const p2=n=>String(n).padStart(2,'0');
+const fdt=ms=>{const d=new Date(ms);return `${d.getDate()} ${MES[d.getMonth()]} ${p2(d.getHours())}:${p2(d.getMinutes())}`};
+const dur=ms=>{ms=Math.abs(ms);const d=Math.floor(ms/D),h=Math.floor(ms%D/H),m=Math.floor(ms%H/60e3);return d?`${d} d ${h} h`:h?`${h} h ${m} min`:`${m} min`};
+const ago=ms=>'hace '+dur(NOW-ms);
+const initials=s=>s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g,'').split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const platChip=p=>p==='MX'?'<span class="chip mx">Bringgo · MX</span>':p==='ES'?'<span class="chip es">EasyShip · ES</span>':'<span class="chip neutral">Plataforma por identificar</span>';
+const platName=p=>p==='MX'?'Bringgo':'EasyShip';
+const stCls={'Abierto':'warn','En gestión':'info','Esperando respuesta':'info','Resuelto':'ok','Resuelto en piso':'ok','Enviado dañado':'warn','Dispose programado':'solid-bad','Dispose realizado':'neutral','Descartado':'neutral'};
+const stChip=s=>`<span class="chip ${stCls[s]||'neutral'}">${s}</span>`;
+const destChip=(d)=>`<span class="dest ${/Pendiente/.test(d)?'pend':/scal/.test(d)?'esc':''}">→ ${esc(d)}</span>`;
+function deadline(t){return t.dupConfirmed?t.dupDue:t.due}
+function dueInfo(t){
+  if(!isOpen(t)||t.status==='Dispose programado')return {k:'none',html:t.status==='Dispose programado'?'<span class="chip bad">Plazo cumplido</span>':''};
+  const diff=deadline(t)-NOW, lbl=t.dupConfirmed?'Duplicado · ':'';
+  if(diff<0)return {k:'late',html:`<span class="chip bad">${lbl}Vencido hace ${dur(diff)}</span>`};
+  if(diff<24*H)return {k:'soon',html:`<span class="chip warn">${lbl}Vence en ${dur(diff)}</span>`};
+  return {k:'ok',html:`<span class="chip neutral">${lbl}Vence ${fdt(deadline(t))}</span>`};
+}
+function toast(msg){const t=$('#toast');t.innerHTML=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,4500)}
+function logAdd(x,who){S.log.unshift({at:NOW,who:who||S.op,x});}
+function hist(t,text,who){t.history.push({at:NOW,who:who||S.op,text});}
+const codeRe=/^(MX|ES)[\s-]?(\d{5,})$/i;
+const normCode=v=>{const m=String(v).trim().match(codeRe);return m?`${m[1].toUpperCase()}-${m[2]}`:null};
+
+/* ---------- Alta de ticket con anti-duplicado ---------- */
+function createTicket({type,code,plat,note,trk=null,ev=[],loc='',waiting=null,status='Abierto',resolution=null,reg=null}){
+  const ex=S.tickets.find(t=>isOpen(t)&&t.type===type&&((code!=='—'&&t.code===code)||(trk&&t.trk===trk)));
+  if(ex){hist(ex,'Evento adicional registrado: '+note);ev.forEach(e=>ex.ev.push(e));if(reg)ex.reg=ex.reg||reg;return {t:ex,appended:true};}
+  const t={id:'INC-0'+(seq++),trk,code,plat,type,created:NOW,reporter:S.op,dept:isAdmin()?U().dept:'Operación',ev,status,owner:null,waiting,loc,history:[],chat:[],chatOpen:false,due:NOW+3*D,assign:[],note,resolution,dupConfirmed:null,dupDue:null,flags:{},reg};
+  t.history.push({at:NOW,who:S.op,text:'Registró la incidencia: '+note});
+  if(status==='Resuelto en piso')t.history.push({at:NOW,who:S.op,text:'Resuelto en piso: '+resolution});
+  if(status==='Enviado dañado'){t.dmg='Pendiente';t.history.push({at:NOW,who:S.op,text:'Re-empacado y enviado dañado · seguimiento: regresa, dispose de paquetería o entregado'});}
+  queueEnrich(t);
+  S.tickets.unshift(t);return {t,appended:false};
+}
+
+/* ---------- Proceso programado (idempotente) ---------- */
+function runJobs(){
+  let changes=0;
+  for(const t of S.tickets){
+    if(!isOpen(t))continue;
+    if(!t.dupConfirmed&&NOW>t.due&&!t.flags.late){t.flags.late=true;t.history.push({at:t.due,who:'Proceso programado',text:'Plazo de 3 días vencido · el ticket sigue abierto y se registra el retraso'});changes++;}
+    if(t.dupConfirmed&&NOW>=t.dupDue&&!t.flags.dispose&&t.status!=='Dispose programado'){
+      t.flags.dispose=true;t.status='Dispose programado';
+      t.history.push({at:t.dupDue,who:'Proceso programado',text:'10 días sin resolución → Dispose programado'});
+      S.disposeLog.unshift({id:t.id,code:t.code,at:t.dupDue,done:null});changes++;}
+  }
+  S.jobRuns.unshift({at:NOW,changes});return changes;
+}
+
+/* ---------- Navegación por rol ---------- */
+const ICONS={
+ tablero:'<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>',
+ registro:'<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M12 8v5M12 16v.5"/>',
+ tickets:'<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4zM10 6v12"/>',
+ misreportes:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/>',
+ danados:'<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10M8 13l2 2M14 9l2 2"/>',
+ duplicados:'<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V4H4v12h4"/>',
+ descartes:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v6M14 10v6"/>',
+ retornos:'<path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
+ equipo:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3 3 0 0 1 0 6M18 14c2 .7 3 2.8 3 6"/>'};
+const TITLES={tablero:'Tablero',registro:'Registrar incidencia',tickets:'Bandeja de tickets',misreportes:'Mis reportes',duplicados:'Mercancías duplicadas',danados:'Enviados dañados',descartes:'Archivo de descartes',retornos:'Retornos',equipo:'Equipo y permisos'};
+function navFor(){
+  return isAdmin()
+   ?[['grp','Gestión'],['tickets'],['tablero'],['duplicados'],['danados'],['descartes'],['grp','Piso'],['registro'],['retornos'],['grp','Personal'],['equipo']]
+   :[['grp','Mi estación'],['registro'],['misreportes'],['retornos']];
+}
+function renderNav(){
+  const open=S.tickets.filter(isOpen), unassigned=open.filter(t=>!t.owner).length;
+  const dupN=S.tickets.filter(t=>t.dupConfirmed&&isOpen(t)).length;
+  const mine=S.tickets.filter(t=>t.reporter===S.op&&isOpen(t)).length;
+  $('#nav').innerHTML=navFor().map(([k,l])=>k==='grp'?`<div class="grp lbl">${l}</div>`:
+   `<a href="#${k}" class="${S.view===k?'on':''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${TITLES[k]}${k==='tickets'&&unassigned?`<span class="cnt" title="Sin responsable">${unassigned}</span>`:''}${k==='duplicados'&&dupN?`<span class="cnt n">${dupN}</span>`:''}${k==='misreportes'&&mine?`<span class="cnt n">${mine}</span>`:''}</a>`).join('');
+  $('#crumb').innerHTML=`${isAdmin()?'Panel administrativo':'Operación'} › <b>${S.sel&&S.view==='tickets'?S.sel:TITLES[S.view]}</b>`;
+  $('#clk').textContent=fdt(NOW);
+  $('#rolechip').textContent=isAdmin()?U().dept:'Operador';
+}
+$('#op').innerHTML=`<optgroup label="Operadores">${USERS.filter(u=>u.role==='op').map(u=>`<option ${u.n===S.op?'selected':''}>${u.n}</option>`).join('')}</optgroup><optgroup label="Procesamiento y Customer Service">${USERS.filter(u=>u.role==='admin').map(u=>`<option>${u.n}</option>`).join('')}</optgroup>`;
+$('#op').addEventListener('change',e=>{S.op=e.target.value;S.sel=null;S.ui={};const allowed=navFor().map(x=>x[0]);if(!allowed.includes(S.view)){location.hash=isAdmin()?'tickets':'registro';}render();toast(`Sesión: <b>${esc(S.op)}</b> · ${isAdmin()?'panel administrativo':'interfaz de operador'}`);});
+
+/* ===================== REGISTRO DE INCIDENCIAS (punto de inicio) ===================== */
+const SAMPLES=[['MX-3015532','code','Teclear MX'],['ES-118412','code','Teclear ES'],['191257610038','scan','Guía mexicana (outbound)'],['9361289717370288014455','scan','Guía americana (inbound)'],['8055420177','scan','Guía de EasyShip'],[BAD_TRK,'scan','Guía no reconocida'],['MX-2958810','code','MX con ticket abierto'],['MX-3999999','code','MX sin coincidencias']];
+function newR(){return {step:1,f:{},chk:{},err:null};}
+function identify(raw,how){
+  const R=S.R||(S.R=newR()); const v=String(raw||'').trim(); R.err=null;
+  if(!v){R.err=how==='code'?'Teclea el código MX o ES.':'Escanea o escribe la guía.';return;}
+  const nc=normCode(v);
+  if(how==='code'&&!nc){R.err=`“${v}” no tiene formato de código MX o ES (ej. MX-3015532 o ES-118412).`;R.focusCode=true;return;}
+  if(nc)Object.assign(R,{code:nc,plat:nc.slice(0,2),trk:null,src:'Código tecleado'});
+  else Object.assign(R,{code:'—',plat:'?',trk:v,src:'Guía escaneada'});
+  Object.assign(R,{step:2,type:null,f:{},nolabel:false});
+}
+function noLabel(){S.R=newR();Object.assign(S.R,{code:'—',plat:'?',trk:null,src:'Sin etiqueta',step:2,type:'sinetiqueta',nolabel:true});}
+const fileBox=(k,l,req)=>`<div class="file"><label class="lbl" for="ev-${k}">${l}${req?' · obligatoria':''}</label><input type="file" id="ev-${k}" data-ev="${k}" accept="image/*" capture="environment">${S.pend[k]?`<span class="chip ok">✓ ${esc(S.pend[k].name)}</span>`:''}</div>`;
+const chk=(k,l)=>`<label class="check" for="c-${k}"><input type="checkbox" id="c-${k}" data-chk="${k}" ${S.R.chk[k]?'checked':''}> ${l}</label>`;
+const radio=(name,opts)=>`<div class="row">${opts.map(([v,l])=>`<label class="check" for="r-${name}-${v}"><input type="radio" name="${name}" id="r-${name}-${v}" data-radio="${name}" value="${v}" ${S.R.f[name]===v?'checked':''}> ${l}</label>`).join('')}</div>`;
+const txt=(k,l,ph,cls)=>`<div class="field"><label class="lbl" for="f-${k}">${l}</label><input type="text" id="f-${k}" data-f="${k}" class="${cls||''}" value="${esc(S.R.f[k]??'')}" placeholder="${esc(ph||'')}"></div>`;
+
+function compute(R){
+  const f=R.f,miss=[],fields=[];
+  if(R.type==='otro'){if(!(f.otro||'').trim())miss.push('Especifica el motivo');else fields.push(['Motivo especificado',f.otro.trim()]);}
+  if(R.nolabel){if(!(f.desc||'').trim())miss.push('Descripción del producto (no tiene código)');else fields.push(['Descripción',f.desc.trim()]);}
+  if((f.nota||'').trim())fields.push(['Nota',f.nota.trim()]);
+  const dmg=R.type==='danado';
+  return {ok:!miss.length,miss,fields,ev:['e1','e2'],status:dmg?'Enviado dañado':'Abierto',waiting:null,loc:dmg?'Enviado con paquetería':'Mesa de incidencias',resolution:null,code:R.code};
+}
+function rType(R){
+  const f=[R.type==='otro'?txt('otro','Especifica el motivo · obligatorio','Ej. paquete abierto con cinta de otra bodega'):'',R.nolabel?txt('desc','Descripción del producto · obligatoria','Ej. lámpara LED de escritorio negra'):''].join('');
+  return f?`<div class="fgrid">${f}</div>`:'';
+}
+function vRegistro(){
+  const R=S.R, s=R?R.step:1;
+  const cls=n=>s>n?'done':s===n?'cur':'locked';
+  const ex=R&&R.step>1&&!R.nolabel?S.tickets.filter(t=>isOpen(t)&&((R.code!=='—'&&t.code===R.code)||(R.trk&&t.trk===R.trk))):[];
+  const c=R&&R.type?compute(R):null;
+  const me=S.session[S.op]||0, b=BASE[S.op]||{i:0};
+  return `<div class="reg"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+  ${S.last?`<div class="banner ok"><span class="ic">✓</span><div><b>${S.last.appended?'Agregado a '+S.last.id:'Registrado '+S.last.id}</b>${esc(TYPES[S.last.type].l)} · ${esc(S.last.code)} · ${S.last.appended?'se agregó al ticket abierto':S.last.type==='danado'?'quedó en el registro de enviados dañados':'ticket abierto, sin responsable; Customer Service y Victor ya lo ven'}.</div></div>`:''}
+
+  <section class="stepcard ${cls(1)}">
+    <div class="stephead"><span class="stepn">1</span><h2>Identifica el paquete</h2><span class="sp"></span>${s>1?`<button class="btn sm" data-a="restart">Cambiar</button>`:''}</div>
+    ${s===1?`
+    <div class="field"><label class="lbl" for="scan">Escanea la guía americana</label>
+      <div class="scanrow" style="margin-top:0"><input id="scan" class="scaninput" type="text" autocomplete="off" spellcheck="false" placeholder="ID…" value="${esc(S.ui.scan||'')}"><button class="btn brand" data-a="scan">Buscar</button></div></div>
+    <div class="or">¿No escanea o el número no es válido?</div>
+    <div class="field"><label class="lbl" for="code">Teclea el código MX o ES con problema</label>
+      <div class="row"><input id="code" class="codeinput" type="text" autocomplete="off" spellcheck="false" placeholder="MX-0000000" value="${esc(S.ui.code||'')}"><button class="btn brand" data-a="usecode">Usar código</button></div></div>
+    ${R&&R.err?`<p class="err" role="alert">${esc(R.err)}</p>`:''}
+    <div class="row"><button class="btn ghost-danger" data-a="nolabel">El paquete no tiene etiqueta</button></div>
+    <div class="samples"><span class="muted">Pruebas:</span>${SAMPLES.map(([v,how,l])=>`<button class="sample" data-a="sample" data-v="${v}" data-how="${how}">${l}</button>`).join('')}</div>`
+    :`<div style="min-width:0"><div class="row"><span class="code">${esc(R.code!=='—'?R.code:(R.trk||'Sin etiqueta'))}</span>${R.nolabel?'':platChip(R.plat)}<span class="chip neutral">${esc(R.src)}</span></div>
+      <p class="small muted" style="margin-top:6px">${R.nolabel?'Sin código: se identifica por descripción.':'La información de la orden no se muestra aquí. Después de registrar, el agente de búsqueda la agrega al ticket en 2–3 min.'}</p></div>
+    ${R.dupHint?`<div class="banner info"><span class="ic">2×</span><div><b>Esta guía americana ya se escaneó</b>${esc(R.dupHint.t)} por ${esc(R.dupHint.who)} para ${esc(R.code)}. Se marcó como duplicado; cámbialo si no aplica.</div></div>`:''}
+    ${ex.length?`<div class="banner warn"><span class="ic">!</span><div><b>Ya hay ${ex.length===1?'un ticket abierto':ex.length+' tickets abiertos'} para ${esc(R.code!=='—'?R.code:R.trk)}</b>${ex.map(t=>`${t.id} · ${esc(TYPES[t.type].l)} · ${t.owner?esc(t.owner):'sin responsable'}`).join('<br>')}<br>Si registras el mismo motivo, se agrega al expediente existente en lugar de crear otro.</div></div>`:''}`}
+  </section>
+
+  <section class="stepcard ${cls(2)}">
+    <div class="stephead"><span class="stepn">2</span><h2>Motivo y abrir ticket</h2></div>
+    ${s===2?`<div class="typegrid">${REG_TYPES.filter(k=>!(R.nolabel&&!['sinetiqueta','otro'].includes(k))).map(k=>`<button class="type${k==='inbound'?' feat':''}${R.type===k?' on':''}" data-a="type" data-v="${k}"><b>${TYPES[k].l}</b>${k==='inbound'?'<span class="act">El tracking no escanea, no es válido o no aparece en la plataforma</span>':''}${k==='otro'?'<span class="act">Especifica el motivo</span>':''}</button>`).join('')}</div>
+    ${R.type?`${rType(R)}${footHTML(c)}`:'<p class="muted small">Elige el motivo; después presiona “Abrir ticket”.</p>'}`:'<p class="muted">Primero identifica el paquete.</p>'}
+  </section>
+
+  </div>
+  <aside class="side-col">
+    <section class="panel"><div class="lbl">Estación de</div><h2>${esc(S.op)}</h2>
+      <div class="stats3" style="margin-top:10px"><div><b class="num">${b.i+me}</b><span>registradas hoy</span></div><div><b class="num">${S.tickets.filter(t=>t.reporter===S.op&&isOpen(t)).length}</b><span>abiertas mías</span></div><div><b class="num">${me}</b><span>esta sesión</span></div></div></section>
+    <section class="panel"><div class="panel-h"><h3>Últimos registros</h3></div>${feed(5)}</section>
+  </aside></div>`;
+}
+function footHTML(c){return `<div class="regfoot" id="regfoot"><div style="display:flex;flex-direction:column;gap:6px"><span class="lbl">${esc(TYPES[S.R.type].l)}</span><span class="small">${S.R.type==='danado'?'Re-empácalo y envíalo. Queda en el registro de enviados dañados; no abre ticket para CS.':'Se abre sin responsable para Victor y Customer Service'}</span>
+      ${c.miss.length?`<ul class="missing">${c.miss.map(m=>`<li>Falta: ${esc(m)}</li>`).join('')}</ul>`:`<span class="small muted">Se registra a nombre de <b>${esc(S.op)}</b> · ${fdt(NOW)}</span>`}</div>
+      <button class="btn danger" data-a="register" ${c.ok?'':'disabled'}>${S.R.type==='danado'?'Registrar envío dañado':'Abrir ticket'}</button></div>`;}
+function register(){
+  const R=S.R,c=compute(R); if(!c.ok)return;
+  const ev=c.ev.map(k=>S.pend[k]).filter(Boolean).map(e=>({...e,by:S.op,at:NOW}));
+  const note=`${TYPES[R.type].l}${c.fields.length?' · '+c.fields.map(([k,v])=>k+': '+v).join(' · '):''}`;
+  const res=createTicket({type:R.type,code:c.code,plat:R.plat,trk:R.trk,note,ev,loc:c.loc,waiting:c.waiting,status:c.status,resolution:c.resolution,reg:{src:R.src,fields:c.fields,trk:R.trk}});
+  S.counts[R.type]=(S.counts[R.type]||0)+1; S.session[S.op]=(S.session[S.op]||0)+1;
+  const lbl=c.code!=='—'?c.code:(R.trk||'sin etiqueta');
+  logAdd(`${res.appended?'Agregó evento a':'Registró'} ${res.t.id} ${TYPES[R.type].l} · ${lbl}`);
+  S.last={id:res.t.id,type:R.type,code:lbl,appended:res.appended};
+  S.R=null;S.pend={};S.ui={};render();window.scrollTo(0,0);
+}
+function feed(n){return `<ul class="feed">${S.log.slice(0,n).map(l=>`<li><span class="t">${fdt(l.at)}</span><span><b>${esc(l.who)}</b> · ${esc(l.x)}</span></li>`).join('')}</ul>`}
+
+/* ===================== MIS REPORTES ===================== */
+function vMisReportes(){
+  const mine=S.tickets.filter(t=>t.reporter===S.op&&t.status!=='Descartado');
+  return `<div class="panel-h"><h1>Mis reportes</h1><span class="muted">Solo consulta. La gestión la hacen Victor y Customer Service.</span></div>
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Motivo</th><th>Registrado</th><th>Destino</th><th>Responsable</th><th>Estado</th></tr></thead><tbody>
+  ${mine.length?mine.map(t=>`<tr><td class="mono"><b>${t.id}</b></td><td class="mono">${esc(t.code)}</td><td>${TYPES[t.type].l}</td><td class="num">${fdt(t.created)}</td><td>${t.reg&&t.reg.dest?destChip(t.reg.dest):'<span class="muted">—</span>'}</td><td>${t.owner?esc(t.owner):'<span class="muted">Sin asignar</span>'}</td><td>${stChip(t.status)}</td></tr>`).join('')
+   :`<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">Aún no registras incidencias en esta sesión.</td></tr>`}
+  </tbody></table></div></section>`;
+}
+
+/* ===================== TABLERO ===================== */
+function vTablero(){
+  const open=S.tickets.filter(isOpen), late=open.filter(t=>dueInfo(t).k==='late'), soon=open.filter(t=>dueInfo(t).k==='soon');
+  const total=REG_TYPES.reduce((a,k)=>a+S.counts[k],0), mx=Math.max(...REG_TYPES.map(k=>S.counts[k]));
+  const floor=S.tickets.filter(t=>t.status==='Resuelto en piso').length;
+  const ops=USERS.filter(u=>u.role==='op');
+  return `<div class="panel-h"><h1>Incidencias de registro</h1><span class="muted">Hoy · cifras de ejemplo más lo registrado en esta sesión</span></div>
+  <div class="kpis">
+    <div class="kpi hl"><span class="lbl">Registradas hoy</span><span class="v num">${total}</span><span class="s">${floor} resueltas en piso</span></div>
+    <div class="kpi"><span class="lbl">Tickets abiertos</span><span class="v num">${open.length}</span><span class="s">${open.filter(t=>!t.owner).length} sin responsable</span></div>
+    <div class="kpi"><span class="lbl">Vencidos</span><span class="v num" style="color:var(--bad)">${late.length}</span><span class="s">siguen abiertos con retraso</span></div>
+    <div class="kpi"><span class="lbl">Vencen en 24 h</span><span class="v num" style="color:var(--warn)">${soon.length}</span><span class="s">alerta previa</span></div>
+    <div class="kpi"><span class="lbl">Duplicados en plazo</span><span class="v num">${S.tickets.filter(t=>t.dupConfirmed&&isOpen(t)&&t.status!=='Dispose programado').length}</span><span class="s">${S.tickets.filter(t=>t.status==='Dispose programado').length} con Dispose programado</span></div>
+  </div>
+  <div class="two">
+    <section class="panel"><div class="panel-h"><h2>Registradas por motivo</h2></div>
+      <div class="hbars">${REG_TYPES.map(k=>`<div class="hb"><span>${TYPES[k].l}</span><div class="bar"><i style="width:${S.counts[k]/mx*100}%;background:${k==='duplicado'?'var(--info)':k==='producto'?'var(--warn)':'var(--brand)'}"></i></div><span class="n">${S.counts[k]}</span></div>`).join('')}</div></section>
+    <section class="panel"><div class="panel-h"><h2>Requieren atención</h2><span class="sp"></span><a class="btn sm" href="#tickets">Abrir bandeja</a></div>
+      ${ticketTable([...late,...soon,...open.filter(t=>!t.owner)].filter((t,i,a)=>a.indexOf(t)===i).slice(0,6),true)}</section>
+  </div>
+  <div class="two">
+    <section class="panel"><div class="panel-h"><h2>Por operador</h2></div><div class="tbl-wrap"><table><thead><tr><th>Operador</th><th>Registradas</th><th>Abiertas</th></tr></thead><tbody>
+      ${ops.map(u=>`<tr><td><b>${u.n}</b> <span class="muted small">${u.r}</span></td><td class="num">${(BASE[u.n]?.i||0)+(S.session[u.n]||0)}</td><td class="num">${S.tickets.filter(t=>t.reporter===u.n&&isOpen(t)).length}</td></tr>`).join('')}</tbody></table></div></section>
+    <section class="panel"><div class="panel-h"><h2>Actividad reciente</h2></div>${feed(7)}</section>
+  </div>`;
+}
+
+/* ===================== BANDEJA ===================== */
+function filtered(){
+  const f=S.fl;
+  return S.tickets.filter(t=>t.status!=='Descartado').filter(t=>{
+    if(f.st==='abiertos'&&!isOpen(t))return false;
+    if(f.st==='sin'&&(!isOpen(t)||t.owner))return false;
+    if(f.st==='mios'&&t.owner!==S.op)return false;
+    if(f.st==='espera'&&t.status!=='Esperando respuesta')return false;
+    if(f.st==='dispose'&&t.status!=='Dispose programado')return false;
+    if(f.st==='piso'&&t.status!=='Resuelto en piso')return false;
+    if(f.st==='cerrados'&&isOpen(t))return false;
+    if(f.owner!=='todos'&&(f.owner==='sin'?t.owner:t.owner!==f.owner))return false;
+    if(f.orig!=='todos'&&t.plat!==f.orig)return false;
+    if(f.type!=='todos'&&t.type!==f.type)return false;
+    const k=dueInfo(t).k; if(f.venc==='late'&&k!=='late')return false; if(f.venc==='soon'&&k!=='soon')return false;
+    return true;});
+}
+function ticketTable(list,compact){
+  return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Motivo</th>${compact?'':'<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact?'':'<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th></tr></thead><tbody>
+  ${list.length?list.map(t=>{const d=dueInfo(t);return `<tr class="click ${d.k==='late'?'late':d.k==='soon'?'soon':''}" data-a="open" data-v="${t.id}" tabindex="0">
+    <td class="mono"><b>${t.id}</b></td><td><span class="mono">${esc(idl(t))}</span> <span class="chip ${t.plat==='MX'?'mx':t.plat==='ES'?'es':'neutral'}">${t.plat}</span></td><td>${TYPES[t.type].l}</td>
+    ${compact?'':`<td>${enrChip(t)}</td><td>${esc(t.reporter)}<div class="muted small">${fdt(t.created)}</div></td>`}
+    <td>${t.owner?esc(t.owner):isOpen(t)?'<span class="chip warn">Sin asignar</span>':'<span class="muted">—</span>'}</td>${compact?'':`<td>${t.waiting&&isOpen(t)?esc(t.waiting):'<span class="muted">—</span>'}</td>`}
+    <td>${d.html}</td><td>${stChip(t.status)}</td></tr>`}).join('')
+  :`<tr><td colspan="9" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>`}
+  </tbody></table></div>`;
+}
+function vTickets(){
+  if(S.sel)return vDetail();
+  const f=S.fl, admins=USERS.filter(u=>u.role==='admin');
+  const list=filtered().sort((a,b)=>(isOpen(b)-isOpen(a))||(deadline(a)-deadline(b)));
+  const last=S.jobRuns[0];
+  return `<div class="panel-h"><h1>Bandeja de tickets</h1><span class="muted">Compartida por Victor y Customer Service · visible desde que se registra · abrir no asigna</span></div>
+  <section class="panel"><div class="filtersbar">
+    <div class="field"><label class="lbl" for="f-st">Estado</label><select id="f-st" data-fl="st">${[['abiertos','Abiertos'],['sin','Sin responsable'],['mios','Asignados a mí'],['espera','Esperando respuesta'],['dispose','Dispose programado'],['piso','Resueltos en piso'],['cerrados','Cerrados'],['todos','Todos']].map(([v,l])=>`<option value="${v}" ${f.st===v?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label class="lbl" for="f-ty">Motivo</label><select id="f-ty" data-fl="type"><option value="todos">Todos</option>${[...REG_TYPES,'retorno'].map(k=>`<option value="${k}" ${f.type===k?'selected':''}>${TYPES[k].l}</option>`).join('')}</select></div>
+    <div class="field"><label class="lbl" for="f-ow">Responsable</label><select id="f-ow" data-fl="owner"><option value="todos">Todos</option><option value="sin" ${f.owner==='sin'?'selected':''}>Sin asignar</option>${admins.map(u=>`<option ${f.owner===u.n?'selected':''}>${u.n}</option>`).join('')}</select></div>
+    <div class="field"><label class="lbl" for="f-or">Origen</label><select id="f-or" data-fl="orig"><option value="todos">MX y ES</option><option value="MX" ${f.orig==='MX'?'selected':''}>Bringgo · MX</option><option value="ES" ${f.orig==='ES'?'selected':''}>EasyShip · ES</option></select></div>
+    <div class="field"><label class="lbl" for="f-ve">Vencimiento</label><select id="f-ve" data-fl="venc"><option value="todos">Cualquiera</option><option value="soon" ${f.venc==='soon'?'selected':''}>Vence en 24 h</option><option value="late" ${f.venc==='late'?'selected':''}>Vencidos</option></select></div>
+  </div></section>
+  <section class="panel" style="padding:6px 8px">${ticketTable(list)}</section>
+  <p class="muted small">Plazo general: 3 días naturales. Duplicados confirmados: 10 días desde la confirmación. Último proceso programado: ${last?fdt(last.at)+' · '+last.changes+' cambio(s)':'aún no corre en esta sesión'}. Agente de búsqueda: ${S.tickets.filter(t=>t.enr?.st==='buscando').length} en cola · ${S.agentLog.length} consultas.</p>`;
+}
+function vDetail(){
+  const t=S.tickets.find(x=>x.id===S.sel); if(!t){S.sel=null;return vTickets();}
+  const me=S.op, mine=t.owner===me, d=dueInfo(t), admins=USERS.filter(u=>u.role==='admin');
+  const canManage=mine||can('transfer'), active=isOpen(t)&&t.status!=='Dispose programado';
+  const tabs=[['chat',`Chat interno${t.chat.length?' ('+t.chat.length+')':''}`],['hist',`Historial (${t.history.length})`],['ev',`Evidencias (${t.ev.length})`]];
+  return `<div class="row"><button class="btn sm" data-a="back">← Bandeja</button></div>
+  <div class="detail">
+   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    <section class="panel">
+      <div class="tk-head"><span class="code">${t.id}</span>${stChip(t.status)}${d.html}<span style="flex:1"></span>${platChip(t.plat)}</div>
+      <h2 style="margin:8px 0 14px">${TYPES[t.type].l} · <span class="mono">${esc(idl(t))}</span></h2>
+      <div class="facts">
+        <div><div class="lbl">Registrado</div><div class="v num">${fdt(t.created)}</div><div class="muted small">${ago(t.created)}</div></div>
+        <div><div class="lbl">Registró</div><div class="v">${esc(t.reporter)}</div><div class="muted small">${esc(t.dept)}</div></div>
+        <div><div class="lbl">Responsable actual</div><div class="v">${t.owner?esc(t.owner):isOpen(t)?'<span class="chip warn">Sin asignar</span>':'—'}</div></div>
+        <div><div class="lbl">Respuesta pendiente de</div><div class="v">${t.waiting&&isOpen(t)?esc(t.waiting):'—'}</div></div>
+        <div><div class="lbl">Ubicación física</div><div class="v">${t.loc?esc(t.loc):'<span class="muted">Sin registrar</span>'}</div></div>
+        <div><div class="lbl">Fecha límite</div><div class="v num">${fdt(deadline(t))}</div><div class="muted small">${t.dupConfirmed?'plazo especial duplicado (10 d)':'plazo general (3 d)'}</div></div>
+      </div>
+      ${t.resolution?`<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>${t.status==='Resuelto en piso'?'Resuelto en piso':'Resolución final'}</b>${esc(t.resolution)}</div></div>`:''}
+    </section>
+    ${t.reg?`<section class="panel"><div class="panel-h"><h3>Registro en piso</h3><span class="sp"></span>${t.reg.dest?destChip(t.reg.dest):''}</div>
+      <dl class="kvlist"><dt>Identificación</dt><dd>${esc(t.reg.src)}</dd>${t.reg.trk?`<dt>Inbound</dt><dd class="mono">${esc(t.reg.trk)}</dd>`:''}${t.reg.fields.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></section>`:''}
+    ${orderPanel(t)}
+    <section class="panel">
+      <div class="panel-h"><div class="tabs">${tabs.map(([k,l])=>`<button class="${S.tab===k?'on':''}" data-a="tab" data-v="${k}">${l}</button>`).join('')}</div></div>
+      ${S.tab==='chat'?rChat(t):S.tab==='hist'?rHist(t):rEv(t)}
+    </section>
+   </div>
+   <aside class="panel mgmt">
+    <section><div class="lbl">Responsable</div>
+      <div class="owner"><div class="av ${t.owner?'on':''}">${t.owner?t.owner[0]:'?'}</div><div><b>${t.owner?esc(t.owner):'Sin responsable'}</b><div class="muted small">${t.assign.length?'Último cambio '+fdt(t.assign[t.assign.length-1].at):'Nadie lo ha tomado'}</div></div></div>
+      ${isOpen(t)?(!t.owner?`<button class="btn brand full" data-a="take" ${can('take')?'':'disabled'}>Tomar ticket</button><p class="muted small">Se asigna a ${esc(me)} con fecha y hora. Si alguien lo tomó un instante antes, se te avisa y no se sobrescribe.</p>`
+        :`<div class="row">${canManage?`<button class="btn sm" data-a="release">Liberar</button><select id="xfer" aria-label="Transferir a">${admins.filter(u=>u.n!==t.owner).map(u=>`<option>${u.n}</option>`).join('')}</select><button class="btn sm" data-a="transfer">Transferir</button>`:''}</div>
+          ${!canManage?'<p class="muted small">Asignado a otra persona. Puedes consultar y escribir en el chat.</p>':''}`):''}
+    </section>
+    ${active?`<section><label class="lbl" for="wait">Departamento del que se espera respuesta</label>
+      <select id="wait" data-a="waiting" ${canManage?'':'disabled'}><option value="">Ninguno</option>${DEPTS.map(x=>`<option ${t.waiting===x?'selected':''}>${x}</option>`).join('')}</select>
+      <span class="muted small">Independiente del responsable.</span></section>
+    <section><label class="lbl" for="loc">Ubicación física</label><div class="row"><input type="text" id="loc" value="${esc(t.loc)}" placeholder="Ej. Anaquel incidencias A-03" style="flex:1 1 140px"><button class="btn sm" data-a="saveloc" ${canManage?'':'disabled'}>Guardar</button></div></section>`:''}
+    ${t.type==='duplicado'?rDupMgmt(t):''}
+    ${active?`<section><label class="lbl" for="res">Resolución final</label><textarea id="res" placeholder="Qué se hizo y dónde quedó el paquete">${esc(S.ui.res||'')}</textarea>
+      <button class="btn primary full" data-a="resolve" ${mine&&can('resolve')?'':'disabled'}>Resolver ticket</button>${mine?'':'<span class="muted small">Toma el ticket para resolverlo.</span>'}</section>`:''}
+    ${t.status!=='Descartado'?`<section>${rDiscard(t)}</section>`:''}
+   </aside>
+  </div>`;
+}
+function rDupMgmt(t){
+  if(!t.dupConfirmed) return `<section><div class="lbl">Mercancía duplicada</div><p class="small">Sin confirmar. Al confirmar inicia el plazo especial de 10 días naturales.</p>
+    <button class="btn full" data-a="confirmdup" ${can('confirmdup')&&isOpen(t)?'':'disabled'}>Confirmar que es duplicado</button></section>`;
+  const total=10*D, left=t.dupDue-NOW, pct=Math.max(0,Math.min(100,(total-left)/total*100));
+  return `<section><div class="lbl">Mercancía duplicada</div>
+    <div class="small">Confirmó <b>${esc(t.dupConfirmed.who)}</b> · ${fdt(t.dupConfirmed.at)}</div>
+    <div class="countdown"><div class="bar"><i style="width:${pct}%;background:${left<0?'var(--bad)':left<2*D?'var(--warn)':'var(--brand)'}"></i></div><span class="num small">${left>0?dur(left)+' restantes':'plazo cumplido'}</span></div>
+    <div class="small muted">Revisión inicial: ${dur(t.dupConfirmed.at-t.created)} · Plazo especial: 10 d (vence ${fdt(t.dupDue)})</div>
+    ${t.status==='Dispose programado'?`<div class="confirmbox"><b>Dispose programado</b><span class="small">La disposición física no se marca como realizada hasta subir la evidencia.</span>
+      ${fileBox2('dsp','Evidencia de la disposición')}
+      <button class="btn danger" data-a="disposedone" ${can('dispose')&&S.pend.dsp?'':'disabled'}>Confirmar Dispose realizado</button>${can('dispose')?'':'<span class="muted small">Solo Victor y Francisco R. confirman la disposición.</span>'}</div>`:''}
+  </section>`;
+}
+const fileBox2=(k,l)=>`<div class="file"><label class="lbl" for="ev-${k}">${l}</label><input type="file" id="ev-${k}" data-ev="${k}" accept="image/*">${S.pend[k]?`<span class="chip ok">✓ ${esc(S.pend[k].name)}</span>`:''}</div>`;
+function rDiscard(t){
+  const st=S.ui.disc||0;
+  if(!can('discard'))return `<span class="muted small">Descartar una incidencia requiere permiso especial.</span>`;
+  if(st===0)return `<button class="btn ghost-danger full" data-a="disc1">Descartar incidencia reportada por error…</button>`;
+  return `<div class="confirmbox"><b>Descartar ${t.id}</b>
+    <span class="small">Sale de la bandeja y pasa al archivo de auditoría. No se borra: conserva historial y evidencias, y puede restaurarse.</span>
+    <label class="lbl" for="dwhy">Justificación (obligatoria)</label><textarea id="dwhy" data-ui="why" placeholder="Por qué se reportó por error">${esc(S.ui.why||'')}</textarea>
+    ${st===1?`<div class="row"><button class="btn sm" data-a="disc0">Cancelar</button><button class="btn danger sm" data-a="disc2">Continuar</button></div>`
+     :`<div class="banner bad"><span class="ic">!</span><div><b>Segunda confirmación</b>¿Descartar ${t.id} a nombre de ${esc(S.op)}?</div></div><div class="row"><button class="btn sm" data-a="disc0">No, volver</button><button class="btn danger sm" data-a="discgo">Sí, descartar</button></div>`}
+  </div>`;
+}
+function rChat(t){
+  if(!t.chatOpen&&!t.chat.length) return `<div class="empty"><h3>Sin conversación</h3><p>El chat se abre solo cuando hace falta coordinar algo.</p><button class="btn brand" style="margin-top:12px" data-a="openchat">Iniciar conversación</button></div>`;
+  return `<div class="chat">${t.chat.map(m=>`<div class="msg ${m.who===S.op?'mine':''}"><div class="mh"><b>${esc(m.who)}</b><span>${fdt(m.at)}</span>${m.tag&&m.tag!=='Mensaje'?`<span class="chip ${m.tag.includes('turco')?'info':'warn'}">${esc(m.tag)}</span>`:''}</div>${esc(m.text)}${m.img?`<img src="${m.img}" alt="Foto adjunta">`:''}</div>`).join('')||'<p class="muted">Escribe el primer mensaje.</p>'}
+   <div class="field" style="margin-top:6px"><div class="row"><label class="lbl" for="ctag">Tipo</label><select id="ctag"><option>Mensaje</option><option>Instrucción del equipo turco</option><option>Instrucción del vendedor Amazon</option><option>Seguimiento</option></select></div>
+   <textarea id="cmsg" data-ui="cmsg" placeholder="Escribe un mensaje o documenta la instrucción recibida">${esc(S.ui.cmsg||'')}</textarea>
+   <div class="row"><input type="file" id="ev-chat" data-ev="chat" accept="image/*" aria-label="Adjuntar foto">${S.pend.chat?`<span class="chip ok">✓ ${esc(S.pend.chat.name)}</span>`:''}<span style="flex:1"></span><button class="btn brand" data-a="sendchat">Enviar</button></div></div></div>`;
+}
+function rHist(t){return `<ul class="timeline">${[...t.history].sort((a,b)=>b.at-a.at).map(h=>`<li><span class="mono muted">${fdt(h.at)}</span><span><b>${esc(h.who)}</b> · ${esc(h.text)}</span></li>`).join('')}</ul>`}
+function evTile(e){return `<div class="ev"><div class="im">${e.src?`<img src="${e.src}" alt="${esc(e.name)}">`:'FOTO'}</div><div class="cap"><b>${esc(e.name)}</b><div class="muted">${esc(e.by)} · ${fdt(e.at)}</div></div></div>`}
+function rEv(t){return `<div class="evgrid">${t.ev.map(evTile).join('')||'<p class="muted">Sin evidencias todavía.</p>'}</div>
+  <div class="row" style="margin-top:12px">${fileBox2('tk','Agregar evidencia')}<button class="btn" data-a="addev" ${S.pend.tk?'':'disabled'}>Adjuntar al expediente</button></div>
+  <p class="muted small" style="margin-top:8px">Las evidencias no se eliminan; quedan en el expediente aunque el ticket se descarte.</p>`}
+
+/* ===================== DUPLICADOS ===================== */
+function vDuplicados(){
+  const conf=S.tickets.filter(t=>t.type==='duplicado'&&t.dupConfirmed&&t.status!=='Descartado').sort((a,b)=>a.dupDue-b.dupDue);
+  const pend=S.tickets.filter(t=>t.type==='duplicado'&&!t.dupConfirmed&&isOpen(t));
+  const avgRev=conf.length?conf.reduce((a,t)=>a+(t.dupConfirmed.at-t.created),0)/conf.length:0;
+  return `<div class="panel-h"><h1>Mercancías duplicadas</h1><span class="muted">Plazo especial de 10 días naturales desde la confirmación · al cumplirse pasa a Dispose programado</span></div>
+  <div class="kpis">
+   <div class="kpi"><span class="lbl">Pendientes de confirmar</span><span class="v num">${pend.length}</span><span class="s">en plazo general de 3 días</span></div>
+   <div class="kpi"><span class="lbl">En plazo especial</span><span class="v num">${conf.filter(t=>isOpen(t)&&t.status!=='Dispose programado').length}</span><span class="s">corriendo los 10 días</span></div>
+   <div class="kpi"><span class="lbl">Dispose programado</span><span class="v num" style="color:var(--bad)">${conf.filter(t=>t.status==='Dispose programado').length}</span><span class="s">esperan evidencia</span></div>
+   <div class="kpi"><span class="lbl">Revisión inicial promedio</span><span class="v num">${dur(avgRev)}</span><span class="s">registro → confirmación</span></div>
+  </div>
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Confirmó</th><th>Revisión inicial</th><th style="min-width:200px">Plazo de 10 días</th><th>Ubicación</th><th>Estado</th></tr></thead><tbody>
+  ${conf.map(t=>{const left=t.dupDue-NOW,pct=Math.max(0,Math.min(100,(10*D-left)/(10*D)*100));return `<tr class="click" data-a="open" data-v="${t.id}" tabindex="0"><td class="mono"><b>${t.id}</b></td><td class="mono">${esc(t.code)}</td><td>${esc(t.dupConfirmed.who)}<div class="muted small">${fdt(t.dupConfirmed.at)}</div></td><td class="num">${dur(t.dupConfirmed.at-t.created)}</td>
+   <td><div class="countdown"><div class="bar"><i style="width:${pct}%;background:${left<0?'var(--bad)':left<2*D?'var(--warn)':'var(--brand)'}"></i></div><span class="num small">${left>0?dur(left):'cumplido'}</span></div></td><td class="small">${esc(t.loc||'—')}</td><td>${stChip(t.status)}</td></tr>`}).join('')}
+  </tbody></table></div></section>
+  ${pend.length?`<section class="panel"><div class="panel-h"><h2>Registrados, sin confirmar</h2></div>${ticketTable(pend,true)}</section>`:''}
+  <section class="panel"><div class="panel-h"><h2>Enviados a Dispose por vencimiento</h2><span class="sp"></span><span class="muted">historial consultable</span></div>
+   <div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Pasó a Dispose programado</th><th>Disposición física</th></tr></thead><tbody>
+   ${S.disposeLog.map(x=>`<tr class="click" data-a="open" data-v="${x.id}"><td class="mono"><b>${x.id}</b></td><td class="mono">${esc(x.code)}</td><td class="num">${fdt(x.at)}</td><td>${x.done?`<span class="chip ok">Realizada ${fdt(x.done)}</span>`:'<span class="chip warn">Pendiente de evidencia</span>'}</td></tr>`).join('')}
+   </tbody></table></div>
+   <p class="muted small" style="margin-top:8px">Usa “+1 día” en el reloj de prueba para ver vencer los plazos. El proceso no repite cambios si corre dos veces.</p></section>`;
+}
+
+/* ===================== DESCARTES ===================== */
+const DMG_OUT=['Pendiente','Regresó','Dispose de paquetería','Entregado'];
+function vDanados(){
+  const list=S.tickets.filter(t=>t.type==='danado'&&t.status==='Enviado dañado').sort((a,b)=>b.created-a.created);
+  const n=k=>list.filter(t=>t.dmg===k).length;
+  const cls={'Pendiente':'warn','Regresó':'info','Dispose de paquetería':'bad','Entregado':'ok'};
+  return `<div class="panel-h"><h1>Enviados dañados</h1><span class="muted">Se re-empacan y se envían. Se registran porque lo esperado es que regresen o terminen en dispose con la paquetería.</span></div>
+  <div class="kpis">
+   <div class="kpi"><span class="lbl">Enviados dañados</span><span class="v num">${list.length}</span><span class="s">registrados</span></div>
+   <div class="kpi"><span class="lbl">Sin desenlace</span><span class="v num" style="color:var(--warn)">${n('Pendiente')}</span><span class="s">en tránsito o sin noticia</span></div>
+   <div class="kpi"><span class="lbl">Regresaron</span><span class="v num">${n('Regresó')}</span><span class="s">se ligan solos al registrar el retorno</span></div>
+   <div class="kpi"><span class="lbl">Dispose de paquetería</span><span class="v num" style="color:var(--bad)">${n('Dispose de paquetería')}</span><span class="s">${n('Entregado')} entregados</span></div>
+  </div>
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Daño</th><th>Registró</th><th>Enviado</th><th>Desenlace</th></tr></thead><tbody>
+  ${list.map(t=>`<tr><td class="mono"><b>${t.id}</b></td><td><span class="mono">${esc(t.code)}</span> <span class="chip ${t.plat==='MX'?'mx':'es'}">${t.plat}</span></td><td class="small">${esc(t.note.replace(/^Dañado o con escurrimiento ?·? ?/,''))}</td><td>${esc(t.reporter)}</td><td class="num">${fdt(t.created)}<div class="muted small">${ago(t.created)}</div></td>
+   <td><select id="dmg-${t.id}" data-dmg="${t.id}" aria-label="Desenlace de ${t.id}">${DMG_OUT.map(o=>`<option ${t.dmg===o?'selected':''}>${o}</option>`).join('')}</select> <span class="chip ${cls[t.dmg]}">●</span></td></tr>`).join('')||'<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Sin envíos dañados.</td></tr>'}
+  </tbody></table></div></section>`;
+}
+function vDescartes(){
+  const list=S.tickets.filter(t=>t.status==='Descartado');
+  return `<div class="panel-h"><h1>Archivo de descartes</h1><span class="muted">Auditoría · fuera del tablero operativo · nada se borra</span></div>
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Motivo</th><th>Descartó</th><th>Justificación</th><th>Evidencias</th><th></th></tr></thead><tbody>
+  ${list.length?list.map(t=>`<tr><td class="mono"><b>${t.id}</b></td><td class="mono">${esc(t.code)}</td><td>${TYPES[t.type].l}</td><td>${esc(t.discard.who)}<div class="muted small">${fdt(t.discard.at)}</div></td><td style="min-width:240px">${esc(t.discard.why)}</td><td class="num">${t.ev.length}</td>
+   <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-a="open" data-v="${t.id}">Ver expediente</button> <button class="btn sm" data-a="restore" data-v="${t.id}" ${can('restore')?'':'disabled'}>Restaurar</button></td></tr>`).join('')
+  :`<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No hay incidencias descartadas.</td></tr>`}
+  </tbody></table></div></section>`;
+}
+
+/* ===================== RETORNOS ===================== */
+function vRetornos(){
+  return `<div class="panel-h"><h1>Retornos</h1><span class="muted">Recepción y registro · Josue y Adrian</span></div>
+  <div class="banner info"><span class="ic">i</span><div><b>Sistema actual en Google Sheets / Google Sites</b>Esta vista es una propuesta. El sistema original no se modifica hasta aprobar la estrategia de migración o sincronización.</div></div>
+  <section class="panel"><div class="panel-h"><h2>Registrar retorno</h2></div>
+   <div class="fgrid"><div class="field"><label class="lbl" for="rt">Guía o código</label><input type="text" id="rt" class="mono" placeholder="MX-2945512"></div>
+   <div class="field"><label class="lbl" for="rc">Paquetería</label><select id="rc">${['PaqueteExpress','FedEx','J&T','DHL','Estafeta','iMile','Correos de México','UPS'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+   <div class="field"><label class="lbl" for="rw">Motivo</label><select id="rw"><option>Destinatario rechazó</option><option>Domicilio no localizado</option><option>Excedió intentos de entrega</option><option>Paquete dañado en ruta</option><option>Otro</option></select></div>
+   <div class="field"><span class="lbl">&nbsp;</span><button class="btn brand" data-a="addret">Registrar como ${esc(S.op)}</button></div></div></section>
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Registrado</th><th>Guía / código</th><th>Paquetería</th><th>Motivo</th><th>Registró</th><th>Seguimiento</th></tr></thead><tbody>
+   ${S.returns.map((r,i)=>`<tr><td class="num">${fdt(r.at)}</td><td class="mono">${esc(r.trk)}</td><td>${esc(r.car)}</td><td>${esc(r.why)}</td><td>${esc(r.who)}</td>
+    <td>${r.tk?(isAdmin()?`<button class="btn sm" data-a="open" data-v="${r.tk}">${r.tk}</button>`:`<span class="mono">${r.tk}</span>`):isAdmin()?`<button class="btn sm" data-a="rettk" data-v="${i}">Crear ticket</button>`:'<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+
+/* ===================== EQUIPO ===================== */
+function vEquipo(){
+  const P=Object.keys(PERM_LABEL), adm=USERS.filter(u=>u.role==='admin');
+  return `<div class="panel-h"><h1>Equipo y permisos</h1></div>
+  <div class="team">${USERS.map(u=>{
+   const st=u.role==='admin'?[[S.tickets.filter(t=>t.owner===u.n&&isOpen(t)).length,'asignados'],[S.tickets.filter(t=>t.owner===u.n&&t.status==='Resuelto').length,'resueltos'],[S.tickets.filter(t=>t.chat.some(m=>m.who===u.n)).length,'en chat']]
+     :[[(BASE[u.n]?.i||0)+(S.session[u.n]||0),'registradas'],[S.tickets.filter(t=>t.reporter===u.n&&isOpen(t)).length,'abiertas'],[BASE[u.n]?.ret??'—','retornos']];
+   return `<div class="mate ${u.role==='admin'?'lead':''}"><div class="who"><div class="av ${u.role==='admin'?'on':''}">${u.n[0]}</div><div><b>${esc(u.n)}</b><div class="muted small">${esc(u.r)}</div></div></div>
+   <div class="stats3">${st.map(x=>`<div><b class="num">${x[0]}</b><span>${x[1]}</span></div>`).join('')}</div></div>`}).join('')}</div>
+  <section class="panel"><div class="panel-h"><h2>Matriz de permisos</h2><span class="sp"></span><span class="muted">propuesta · en el sistema real se valida en backend y base de datos</span></div>
+   <div class="tbl-wrap"><table><thead><tr><th>Acción</th><th>Operadores (6)</th>${adm.map(u=>`<th>${esc(u.n)}</th>`).join('')}</tr></thead><tbody>
+   <tr><td>Registrar incidencia con evidencia</td><td class="yes">Sí</td>${adm.map(()=>'<td class="yes">Sí</td>').join('')}</tr>
+   <tr><td>Ver bandeja, chat, historial y evidencias</td><td class="no">No</td>${adm.map(()=>'<td class="yes">Sí</td>').join('')}</tr>
+   ${P.map(p=>`<tr><td>${PERM_LABEL[p]}</td><td class="no">No</td>${adm.map(u=>u.perms.includes(p)?'<td class="yes">Sí</td>':'<td class="no">No</td>').join('')}</tr>`).join('')}
+   <tr><td>Eliminar evidencias</td><td class="no">No</td>${adm.map(()=>'<td class="no">No</td>').join('')}</tr>
+   </tbody></table></div></section>
+  <section class="panel"><div class="panel-h"><h2>Cuentas de Bringgo y EasyShip para el agente</h2><span class="sp"></span><span class="muted">el agente consulta con la cuenta de <b>${esc(S.agentAccount)}</b></span></div>
+   <p class="small" style="margin-bottom:10px">Por ahora se usan las cuentas existentes de Francisco R. Más adelante cada miembro del equipo puede ligar las suyas. Las contraseñas nunca se escriben aquí: en el sistema real se capturan en un formulario seguro y se guardan en el gestor de secretos del servidor.</p>
+   <div class="tbl-wrap"><table><thead><tr><th>Usuario</th><th>Bringgo</th><th>EasyShip</th><th>Usar para el agente</th></tr></thead><tbody>
+   ${adm.map(u=>{const a=S.accounts[u.n]||{};const cell=k=>a[k]?'<span class="chip ok">Conectada</span>':(can('users')?`<button class="btn sm" data-a="acct" data-v="${esc(u.n)}" data-k="${k}">Conectar</button>`:'<span class="chip neutral">Sin conectar</span>');
+     return `<tr><td><b>${esc(u.n)}</b></td><td>${cell('bringgo')}</td><td>${cell('easy')}</td><td>${S.agentAccount===u.n?'<span class="chip info">En uso</span>':(a.bringgo&&a.easy&&can('users')?`<button class="btn sm" data-a="useacct" data-v="${esc(u.n)}">Usar esta</button>`:'<span class="muted small">—</span>')}</td></tr>`}).join('')}
+   </tbody></table></div></section>`;
+}
+
+/* ===================== RENDER / RUTAS ===================== */
+const VIEWS={registro:vRegistro,misreportes:vMisReportes,tablero:vTablero,tickets:vTickets,duplicados:vDuplicados,danados:vDanados,descartes:vDescartes,retornos:vRetornos,equipo:vEquipo};
+function render(focus){
+  renderNav(); $('#view').innerHTML=VIEWS[S.view]();
+  if(S.view==='registro'&&focus!==false){const R=S.R;const el=R&&R.focusCode?$('#code'):(!R||R.step===1)?$('#scan'):null;el&&el.focus();if(R)R.focusCode=false;}
+}
+function route(){const h=location.hash.slice(1);const allowed=navFor().map(x=>x[0]);S.view=VIEWS[h]&&allowed.includes(h)?h:(isAdmin()?'tickets':'registro');S.sel=null;S.ui={};render();window.scrollTo(0,0);}
+window.addEventListener('hashchange',route);
+function openTicket(id){S.sel=id;S.tab='chat';S.ui={};S.pend={};if(S.view!=='tickets'){history.replaceState(null,'','#tickets');S.view='tickets';}render();window.scrollTo(0,0);}
+
+/* ===================== ACCIONES DE TICKET ===================== */
+const TK=()=>S.tickets.find(x=>x.id===S.sel);
+function tAct(a){
+  const t=TK(); if(!t)return;
+  switch(a){
+   case 'take':{ if(!need('take'))return;
+     // Toma atómica en backend: UPDATE tickets SET owner_id=:me WHERE id=:id AND owner_id IS NULL
+     if(t.owner){toast(`<b>${esc(t.owner)}</b> tomó este ticket un instante antes. No se sobrescribió.`);break;}
+     t.owner=S.op; t.assign.push({at:NOW,who:S.op,a:'Tomó el ticket'}); hist(t,'Tomó el ticket'); if(t.status==='Abierto')t.status=t.waiting?'Esperando respuesta':'En gestión';
+     logAdd(`Tomó ${t.id}`); toast(`${t.id} asignado a <b>${esc(S.op)}</b> · ${fdt(NOW)}`); break;}
+   case 'release':{ if(t.owner!==S.op&&!need('transfer'))return; const prev=t.owner; t.owner=null; t.assign.push({at:NOW,who:S.op,a:'Liberó (era '+prev+')'}); hist(t,'Liberó el ticket (responsable anterior: '+prev+')'); if(t.status==='En gestión')t.status='Abierto'; toast(`${t.id} liberado. Vuelve a “Sin responsable”.`); break;}
+   case 'transfer':{ if(t.owner!==S.op&&!need('transfer'))return; const to=$('#xfer').value, prev=t.owner; t.owner=to; t.assign.push({at:NOW,who:S.op,a:`Transfirió de ${prev} a ${to}`}); hist(t,`Transfirió de ${prev} a ${to}`); toast(`${t.id} transferido a <b>${esc(to)}</b>`); break;}
+   case 'saveloc':{ const v=$('#loc').value.trim(); if(v===t.loc)return; t.loc=v; hist(t,'Ubicación física: '+(v||'sin registrar')); toast('Ubicación guardada'); break;}
+   case 'confirmdup':{ if(!need('confirmdup'))return; t.dupConfirmed={at:NOW,who:S.op}; t.dupDue=NOW+10*D; hist(t,'Confirmó mercancía duplicada · inicia plazo de 10 días (vence '+fdt(t.dupDue)+')'); toast(`Duplicado confirmado. Vence ${fdt(t.dupDue)}.`); break;}
+   case 'resolve':{ if(!need('resolve'))return; if(t.owner!==S.op){toast('Toma el ticket para resolverlo.');return;} const r=$('#res').value.trim(); if(r.length<8){toast('Escribe la resolución final (qué se hizo y dónde quedó el paquete).');$('#res').focus();return;}
+     t.status='Resuelto'; t.resolution=r; hist(t,'Resolvió: '+r); logAdd(`Resolvió ${t.id}`); S.ui.res=''; toast(`${t.id} resuelto`); break;}
+   case 'disposedone':{ if(!need('dispose'))return; if(!S.pend.dsp){toast('Sube la evidencia de la disposición.');return;} t.ev.push({...S.pend.dsp,by:S.op,at:NOW}); t.status='Dispose realizado'; hist(t,'Confirmó Dispose realizado con evidencia'); const l=S.disposeLog.find(x=>x.id===t.id); if(l)l.done=NOW; S.pend.dsp=null; toast('Disposición registrada con evidencia'); break;}
+   case 'disc1': if(!need('discard'))return; S.ui.disc=1; break;
+   case 'disc0': S.ui.disc=0; break;
+   case 'disc2': if((S.ui.why||'').trim().length<10){toast('La justificación es obligatoria (mínimo 10 caracteres).');return;} S.ui.disc=2; break;
+   case 'discgo':{ if(!need('discard'))return; t.prevStatus=t.status; t.status='Descartado'; t.discard={at:NOW,who:S.op,why:S.ui.why.trim()}; hist(t,'Descartó la incidencia: '+t.discard.why); logAdd(`Descartó ${t.id}`); S.ui={}; toast(`${t.id} pasó al archivo de descartes. Historial y evidencias se conservan.`); break;}
+   case 'openchat': t.chatOpen=true; break;
+   case 'sendchat':{ const txt=($('#cmsg').value||'').trim(); if(!txt&&!S.pend.chat){toast('Escribe un mensaje o adjunta una foto.');return;}
+     const tag=$('#ctag').value; t.chat.push({at:NOW,who:S.op,tag,text:txt,img:S.pend.chat?.src||null}); if(S.pend.chat)t.ev.push({...S.pend.chat,by:S.op,at:NOW});
+     hist(t,tag==='Mensaje'?'Escribió en el chat':'Documentó: '+tag); S.ui.cmsg=''; S.pend.chat=null; break;}
+   case 'addev':{ if(!S.pend.tk)return; t.ev.push({...S.pend.tk,by:S.op,at:NOW}); hist(t,'Agregó evidencia: '+S.pend.tk.name); S.pend.tk=null; break;}
+  }
+  render(false);
+}
+
+/* ===================== EVENTOS ===================== */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.id==='scan'){identify(e.target.value,'scan');render();}
+  if(e.key==='Enter'&&e.target.id==='code'){identify(e.target.value,'code');render();}
+  if(e.key==='Enter'&&e.target.dataset?.f&&S.R&&S.R.type&&compute(S.R).ok){e.preventDefault();register();}
+  if(e.key==='Enter'&&e.target.matches('tr[data-a=open]')){openTicket(e.target.dataset.v);}
+});
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(el.dataset.f&&S.R){S.R.f[el.dataset.f]=el.value;const ft=$('#regfoot');if(ft&&S.R.type)ft.outerHTML=footHTML(compute(S.R));}
+  if(el.dataset.ui)S.ui[el.dataset.ui]=el.value;
+  if(el.id==='scan'||el.id==='code')S.ui[el.id]=el.value;
+  if(el.id==='res')S.ui.res=el.value;
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.dataset.ev){const file=el.files&&el.files[0];if(!file)return;const key=el.dataset.ev;
+    const r=new FileReader();r.onload=()=>{S.pend[key]={name:file.name,src:file.size<4e6?r.result:null};render(false);};r.readAsDataURL(file);return;}
+  if(el.dataset.chk&&S.R){S.R.chk[el.dataset.chk]=el.checked;render(false);return;}
+  if(el.dataset.radio&&S.R){S.R.f[el.dataset.radio]=el.value;render(false);return;}
+  if(el.dataset.q&&S.R){S.R.f.q=+el.dataset.q;render(false);return;}
+  if(el.dataset.dmg){const t=S.tickets.find(x=>x.id===el.dataset.dmg);t.dmg=el.value;hist(t,'Desenlace del envío dañado: '+el.value);toast(`${t.id} → ${esc(el.value)}`);render(false);return;}
+  if(el.dataset.fl){S.fl[el.dataset.fl]=el.value;render();return;}
+  if(el.dataset.a==='waiting'){const t=TK();const v=el.value||null;if(v===t.waiting)return;t.waiting=v;if(v){t.status='Esperando respuesta';hist(t,'Esperando respuesta de '+v);}else{t.status=t.owner?'En gestión':'Abierto';hist(t,'Ya no se espera respuesta de otro departamento');}render(false);}
+});
+document.addEventListener('click',e=>{
+  const nl=e.target.closest('.nav a'); if(nl&&nl.getAttribute('href')===location.hash){e.preventDefault();route();return;}
+  const el=e.target.closest('[data-a]'); if(!el)return;
+  const a=el.dataset.a, v=el.dataset.v;
+  if(el.tagName==='SELECT'||el.dataset.ev)return;
+  if(['take','release','transfer','saveloc','confirmdup','resolve','disposedone','disc1','disc0','disc2','discgo','openchat','sendchat','addev'].includes(a)){tAct(a);return;}
+  switch(a){
+   case 'tick':{NOW+=D;runAgent();const n=runJobs();render(false);toast(`Reloj +1 día → ${fdt(NOW)}. Proceso programado: ${n} cambio(s).`);break;}
+   case 'fast':{NOW+=180000;const n=runAgent();render(false);toast(`Reloj +3 min → ${fdt(NOW)}. Agente de búsqueda: ${n} ticket(s) con información nueva.`);break;}
+   case 'acct':{if(!need('users'))break;const a=S.accounts[v]||(S.accounts[v]={});a[el.dataset.k]=true;toast(`Cuenta de ${el.dataset.k==='easy'?'EasyShip':'Bringgo'} de ${esc(v)} conectada (simulado). En el sistema real se abre un formulario seguro.`);render(false);break;}
+   case 'useacct':{if(!need('users'))break;S.agentAccount=v;toast(`El agente ahora consulta con la cuenta de ${esc(v)}.`);render(false);break;}
+   case 'research':{const t=TK();const v=($('#recode').value||'').trim();if(!v){toast('Escribe un MX/ES o una guía.');break;}const nc=normCode(v);if(nc){t.code=nc;t.plat=nc.slice(0,2);}else t.trk=v;queueEnrich(t);hist(t,'Pidió nueva búsqueda con '+v);render(false);toast('En cola. La información llega en 2–3 min.');break;}
+   case 'open': openTicket(v);break;
+   case 'back': S.sel=null;S.ui={};render();break;
+   case 'tab': S.tab=v;render(false);break;
+   case 'restore':{if(!need('restore'))return;const t=S.tickets.find(x=>x.id===v);t.status=t.prevStatus||'Abierto';hist(t,'Restauró la incidencia descartada');logAdd('Restauró '+t.id);toast(`${t.id} restaurado a ${t.status}`);render();break;}
+   case 'scan': S.last=null;identify($('#scan').value,'scan');render();break;
+   case 'usecode': S.last=null;{const bad=S.R&&S.R.badTrk;identify($('#code').value,'code');if(bad&&S.R&&S.R.step>1&&!S.R.badTrk)S.R.badTrk=bad;}render();break;
+   case 'sample':{S.last=null;S.pend={};const how=el.dataset.how;
+      if(how==='scan'){S.R=null;S.ui={scan:v};identify(v,'scan');}else{S.ui={...S.ui,code:v};const bad=S.R&&S.R.badTrk;S.R=bad?{...newR(),badTrk:bad}:null;identify(v,'code');}
+      render();break;}
+   case 'nolabel': S.last=null;S.pend={};noLabel();render();break;
+   case 'restart': S.R=null;S.pend={};S.ui={};render();break;
+   case 'type': S.R.type=v;S.R.f={};render(false);{const i=$('#f-otro')||$('#f-desc');if(i)i.focus();else $('[data-a=register]')?.focus();}break;
+   case 'retype': S.R.step=2;S.R.type=null;S.R.dupHint=null;render(false);break;
+   case 'register': register();break;
+   case 'addret':{const t=$('#rt').value.trim().toUpperCase();if(!t){toast('Escribe la guía o el código del retorno.');$('#rt').focus();break;}
+      const ex=S.returns.find(r=>r.trk===t);if(ex){toast(`${esc(t)} ya se registró ${fdt(ex.at)} por ${esc(ex.who)}. No se duplicó.`);break;}
+      S.returns.unshift({at:NOW,trk:t,car:$('#rc').value,why:$('#rw').value,who:S.op,tk:null});logAdd('Retorno registrado '+t);
+      const dm=S.tickets.find(x=>x.type==='danado'&&x.status==='Enviado dañado'&&x.code===t);if(dm){dm.dmg='Regresó';hist(dm,'Regresó: retorno registrado por '+S.op);S.returns[0].tk=dm.id;toast(`Retorno registrado. Era un envío dañado (${dm.id}); se marcó como “Regresó”.`);}else toast('Retorno registrado');render();break;}
+   case 'rettk':{const r=S.returns[+v];const res=createTicket({type:'retorno',code:r.trk,plat:r.trk.startsWith('ES')?'ES':'MX',note:`Retorno ${r.car}: ${r.why}`,loc:'Área de retornos'});r.tk=res.t.id;hist(res.t,'Creado desde registro de retornos de '+r.who);toast(`${res.t.id} creado para el retorno ${esc(r.trk)}`);render();break;}
+  }
+});
+
+runJobs(); S.jobRuns=[];
+/* Reloj en vivo: avanza en tiempo real y el agente revisa su cola cada segundo */
+setInterval(()=>{
+  NOW+=1000; const c=$('#clk'); if(c)c.textContent=fdt(NOW);
+  document.querySelectorAll('[data-eta]').forEach(el=>{const ms=+el.dataset.eta-NOW;el.textContent=ms>0?'~'+mmss(ms):'en unos segundos';});
+  const n=runAgent();
+  if(n&&isAdmin()&&['tickets','tablero','duplicados'].includes(S.view)){
+    const a=document.activeElement;
+    if(a&&$('#view').contains(a)&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName))S.pendRender=true; else render(false);
+    toast(`Agente de búsqueda: ${n} ticket(s) con información de la orden.`);
+  }
+},1000);
+document.addEventListener('focusout',()=>{if(S.pendRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&$('#view').contains(a)&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName))){S.pendRender=false;render(false);}},300);});
+route();
+</script>

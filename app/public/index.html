@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MX Wharehouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app" id="shell" hidden>
+  <aside class="side">
+    <div class="brandmark"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro · piloto</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="printer" id="agent"><span class="dot"></span> Agente de búsqueda…</div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumb" id="crumb"></div>
+      <div class="sp"></div>
+      <div class="opsel"><b id="who"></b><span class="rolechip" id="rolechip"></span><button class="btn sm" data-a="logout">Salir</button></div>
+    </header>
+    <main id="view"></main>
+  </div>
+</div>
+<main id="loginview" hidden></main>
+<div id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
