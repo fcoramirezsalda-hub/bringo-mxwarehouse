@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-11-16 · Claude Code · rama `agente/claude/instalador-windows`
+
+- `app/instalar-windows.bat` + `app/instalar-windows.ps1`: instalador para la PC de la bodega (Node ≥ 22.13, npm install, Chromium del agente,
+  `npm run setup` solo si no hay base, tareas programadas al iniciar sesión para servidor y agente, regla de firewall 8080 en red privada,
+  suspensión desactivada con corriente, `agent:login` si no hay sesión). Idempotente.
+- **No probado en Windows**: aquí no hay PowerShell. Probarlo en la PC de la bodega es el siguiente paso.
+- La PC aún no está conectada por Remote Control (no aparece ninguna carpeta compartida).
+
 ## 2026-11-15 (10) · Claude Code · rama `agente/claude/ux-registro-estado`
 
 - Registro: cuando "Abrir ticket" está desactivado, se muestra qué falta ("Falta: especifica el motivo y describe el producto.").

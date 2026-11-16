@@ -8,7 +8,16 @@ y un agente busca la información de la orden en Bringgo y EasyShip (solo lectur
 - PC con Windows, siempre encendida durante el turno (sin suspensión) y con internet.
 - **Node.js 24 LTS** (o 22.13 o más nuevo) desde https://nodejs.org → "Windows Installer".
 
-## Instalación (una vez)
+## Instalación rápida (recomendada)
+
+1. Instala **Node.js 24 LTS**.
+2. Descarga el repositorio (botón verde **Code → Download ZIP** en GitHub, o `git clone`) y descomprímelo en `C:\wms-agente`.
+3. En `C:\wms-agente\app`, clic derecho en **instalar-windows.bat → Ejecutar como administrador**.
+
+El instalador hace todo lo de la sección siguiente: dependencias, usuarios y PIN, arranque automático al iniciar sesión,
+firewall para la red privada, suspensión desactivada y la sesión de Bringgo/EasyShip para el agente. Se puede correr otra vez sin perder datos.
+
+## Instalación manual (una vez)
 
 1. Copia la carpeta `app` a la PC, por ejemplo `C:\wms-agente\app`.
 2. Abre "Símbolo del sistema" en esa carpeta y ejecuta, uno por uno:
