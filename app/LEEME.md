@@ -72,6 +72,10 @@ para respaldo y para que Customer Service pueda consultarlos desde fuera de la b
 3. En esta PC ejecuta `npm run sheets:setup`. Muestra un **TOKEN**.
 4. En Apps Script: **Configuración del proyecto (engrane) → Propiedades de la secuencia de comandos → Agregar propiedad**:
    nombre `TOKEN`, valor el que mostró el paso 3.
+   Después, en la barra de arriba elige la función **probar** y presiona **Ejecutar**: la primera vez Google pide permisos
+   (Revisar permisos → tu cuenta → Configuración avanzada → Ir a … → Permitir). El registro debe decir "Todo bien".
+   No uses Ejecutar ni Depurar con **doPost**: esa función solo corre cuando la PC envía datos y en el editor se queda esperando
+   hasta "Excedió el tiempo máximo de ejecución".
 5. En Apps Script: **Implementar → Nueva implementación → Tipo: Aplicación web**. Ejecutar como: **Yo**. Quién tiene acceso: **Cualquier usuario**.
    Autoriza los permisos que pide Google y copia la **URL de la aplicación web** (termina en `/exec`).
 6. Pega esa URL en la ventana del paso 3. Si todo está bien dice "Listo" y aparecen las pestañas **Tickets** e **Historial** en la hoja.
