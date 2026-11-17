@@ -10,7 +10,7 @@ function Paso($t) { Write-Host "`n== $t ==" -ForegroundColor Cyan }
 function Ok($t)   { Write-Host "  OK  $t" -ForegroundColor Green }
 function Aviso($t){ Write-Host "  !!  $t" -ForegroundColor Yellow }
 
-Paso '1/6 Node.js'
+Paso '1/7 Node.js'
 try { $v = (node -v).TrimStart('v') } catch { $v = $null }
 if (-not $v -or [version]$v -lt [version]'22.13.0') {
   Aviso "Falta Node.js 22.13 o más nuevo (encontrado: $v). Se abre la página de descarga: instala la versión LTS y vuelve a correr este instalador."
@@ -19,7 +19,7 @@ if (-not $v -or [version]$v -lt [version]'22.13.0') {
 }
 Ok "Node.js $v"
 
-Paso '2/6 Dependencias'
+Paso '2/7 Dependencias'
 npm install --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) { throw 'npm install falló. Revisa la conexión a internet.' }
 Ok 'Dependencias instaladas'
@@ -38,7 +38,7 @@ else {
   else { Aviso 'No se pudo descargar el navegador del agente. El resto se instala igual; instala Microsoft Edge o vuelve a correr este instalador con mejor conexión.' }
 }
 
-Paso '3/6 Base de datos y usuarios'
+Paso '3/7 Base de datos y usuarios'
 if (Test-Path 'data\incidencias.db') { Ok 'Ya existe; no se cambió nada.' }
 else {
   npm run setup
@@ -46,7 +46,7 @@ else {
   Read-Host 'Presiona Enter cuando los hayas anotado'
 }
 
-Paso '4/6 Arranque automático al iniciar sesión'
+Paso '4/7 Arranque automático al iniciar sesión'
 foreach ($n in @(@{Nombre='MX Wharehouse - Servidor'; Bat='iniciar-servidor.bat'}, @{Nombre='MX Wharehouse - Agente'; Bat='iniciar-agente.bat'})) {
   $accion = New-ScheduledTaskAction -Execute (Join-Path $PSScriptRoot $n.Bat) -WorkingDirectory $PSScriptRoot
   $disparo = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
@@ -55,7 +55,7 @@ foreach ($n in @(@{Nombre='MX Wharehouse - Servidor'; Bat='iniciar-servidor.bat'
   Ok $n.Nombre
 }
 
-Paso '5/6 Red y energía'
+Paso '5/7 Red y energía'
 if ($admin) {
   if (-not (Get-NetFirewallRule -DisplayName 'MX Wharehouse 8080' -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule -DisplayName 'MX Wharehouse 8080' -Direction Inbound -Protocol TCP -LocalPort 8080 -Profile Private -Action Allow | Out-Null
@@ -68,16 +68,34 @@ if ($admin) {
   Aviso 'Desactiva la suspensión en Configuración → Sistema → Inicio/apagado y suspensión.'
 }
 
-Paso '6/6 Sesión de Bringgo y EasyShip para el agente'
-if (Test-Path 'perfil-agente') { Ok 'Ya hay una sesión guardada. Si vence, corre: npm run agent:login' }
+Paso '6/7 Sesión de Bringgo y EasyShip para el agente'
+if (Test-Path 'perfil-agente') { Ok 'Ya hay una sesión guardada (carpeta perfil-agente). Si vence, corre: npm run agent:login' }
 else {
-  Write-Host '  Se abrirá un navegador. Inicia sesión en Bringgo y en EasyShip y luego cierra la ventana.'
+  Write-Host '  Ahora se abrirá Microsoft Edge con Bringgo y EasyShip. Inicia sesión en los dos y luego CIERRA la ventana de Edge.'
+  Write-Host '  (El instalador espera aquí hasta que cierres esa ventana.)'
   npm run agent:login
+  if ($LASTEXITCODE -ne 0) { Aviso 'No se pudo abrir el navegador del agente. Copia el error de arriba y envíalo. El resto del sistema funciona igual.' }
 }
 
+Paso '7/7 Arrancar ahora y comprobar'
+Get-ScheduledTask -TaskName 'MX Wharehouse - Servidor' | Start-ScheduledTask
+if (Test-Path 'perfil-agente') { Get-ScheduledTask -TaskName 'MX Wharehouse - Agente' | Start-ScheduledTask }
+Write-Host '  Se abren ventanas negras del servidor y del agente: déjalas abiertas (puedes minimizarlas).'
+$arriba = $false
+foreach ($i in 1..30) {
+  Start-Sleep -Seconds 2
+  try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 'http://localhost:8080' | Out-Null; $arriba = $true; break } catch {}
+}
 $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
-Write-Host "`nListo." -ForegroundColor Green
-Write-Host "  En esta PC:              http://localhost:8080"
-if ($ip) { Write-Host "  Otros equipos de la red: http://${ip}:8080" }
-Write-Host '  Para arrancar ahora sin reiniciar: Programador de tareas → "MX Wharehouse - Servidor" y "- Agente" → Ejecutar.'
+if ($arriba) {
+  Ok 'El servidor responde en http://localhost:8080'
+  Start-Process 'http://localhost:8080'
+  Write-Host "`nListo." -ForegroundColor Green
+  Write-Host "  En esta PC:              http://localhost:8080"
+  if ($ip) { Write-Host "  Otros equipos de la red: http://${ip}:8080" }
+  Write-Host '  Desde ahora el servidor y el agente arrancan solos cada vez que inicies sesión en Windows.'
+} else {
+  Aviso 'El servidor no respondió en 60 segundos. Revisa la ventana negra "iniciar-servidor": el error aparece ahí.'
+  Aviso 'Si no hay ventana, da doble clic a iniciar-servidor.bat en esta carpeta y envía una captura de lo que muestre.'
+}
 Write-Host '  Copia a Google Sheets (opcional): npm run sheets:setup  (ver LEEME.md)'

@@ -1,5 +1,15 @@
 # Handoff
 
+## 2026-11-17 (5) · Claude Code · instalador arranca el sistema y lo comprueba
+
+- En la PC de la bodega el instalador terminó, pero http://localhost:8080 no respondía y no se vio Edge en el paso 6.
+  Causa probable de localhost: las tareas programadas solo arrancan al iniciar sesión, así que nada estaba corriendo.
+- Nuevo paso 7/7: inicia las tareas "MX Wharehouse - Servidor" y "- Agente", espera hasta 60 s a que responda
+  http://localhost:8080 y lo abre en el navegador; si no responde, indica dónde ver el error.
+- Paso 6: explica que se abrirá Edge y que hay que cerrarlo; si `agent:login` falla, lo avisa en lugar de seguir en silencio.
+- Pendiente: saber por qué no se abrió Edge (¿existía `perfil-agente`? ¿error de Playwright 1.47 con Node 26?). Pedí captura al propietario.
+  El servidor arranca bien con Node 22 aquí; no se pudo probar con Node 26 ni con PowerShell en este entorno.
+
 ## 2026-11-17 (4) · Claude Code · instalador: no depender de descargar Chromium
 
 - En la PC de la bodega `npx playwright install chromium` se cortó por tiempo (descarga de 140 MB) y el instalador se detuvo.
