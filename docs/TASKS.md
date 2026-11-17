@@ -47,8 +47,9 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 |---|---|---|---|
 | 3.1 | Descarte con justificación, doble confirmación, archivo y restauración | Claude Code | pendiente |
 | 3.2 | Chat interno por ticket con tipos de instrucción | Claude Code | pendiente |
-| 3.3 | Propuesta de sincronización con Google Sheets de retornos | ChatGPT → propietario | pendiente |
-| 3.4 | Implementar la sincronización aprobada | Claude Code | bloqueado: falta aprobación |
+| 3.3 | Propuesta de sincronización con Google Sheets de retornos | Claude Code → propietario | propuesta en `docs/ADR-001-retornos.md` |
+| 3.4 | Implementar la fuente real aprobada (adaptador `sheet`) | Claude Code | bloqueado: falta aprobación |
+| 3.5 | Menú "Retornos escaneados" (apagado por defecto, demo, abrir ticket) a partir del ZIP de Codex | Claude Code | hecho 2026-11-17 |
 
 ## Hecho
 

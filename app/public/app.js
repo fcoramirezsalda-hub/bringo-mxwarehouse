@@ -57,13 +57,14 @@ async function showLogin() {
 }
 
 /* ---------- Navegación ---------- */
-const TITLES = { registro: 'Registrar incidencia', misreportes: 'Mis reportes', tickets: 'Bandeja de tickets', tablero: 'Tablero', duplicados: 'Mercancías duplicadas', danados: 'Enviados dañados', descartes: 'Archivo de descartes', equipo: 'Equipo y permisos' };
-const ICONS = {
+const TITLES = { retornos: 'Retornos escaneados', registro: 'Registrar incidencia', misreportes: 'Mis reportes', tickets: 'Bandeja de tickets', tablero: 'Tablero', duplicados: 'Mercancías duplicadas', danados: 'Enviados dañados', descartes: 'Archivo de descartes', equipo: 'Equipo y permisos' };
+const ICONS = { retornos: '<path d="M4 6h16v14H4zM8 3v6M16 3v6M8 14h8"/>',
   registro: '<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M12 8v5M12 16v.5"/>', misreportes: '<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/>',
   tickets: '<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4zM10 6v12"/>', tablero: '<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>',
   duplicados: '<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V4H4v12h4"/>', danados: '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/>',
   descartes: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>', equipo: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' };
-const navFor = () => isAdmin() ? [['grp', 'Gestión'], ['tickets'], ['tablero'], ['duplicados'], ['danados'], ['descartes'], ['grp', 'Piso'], ['registro'], ['grp', 'Personal'], ['equipo']] : [['grp', 'Mi estación'], ['registro'], ['misreportes']];
+const hasReturns = () => !!S.me && !!S.me.returns_mode && S.me.returns_mode !== 'off';
+const navFor = () => { const ret = hasReturns() ? [['retornos']] : []; return isAdmin() ? [['grp', 'Gestión'], ['tickets'], ['tablero'], ['duplicados'], ['danados'], ['descartes'], ['grp', 'Piso'], ['registro'], ...ret, ['grp', 'Personal'], ['equipo']] : [['grp', 'Mi estación'], ['registro'], ['misreportes'], ...ret]; };
 function renderNav() {
   $('#nav').innerHTML = navFor().map(([k, l]) => k === 'grp' ? `<div class="grp lbl">${l}</div>` : `<a href="#${k}" class="${S.view === k ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${TITLES[k]}</a>`).join('');
   $('#crumb').innerHTML = `${isAdmin() ? 'Panel administrativo' : 'Operación'} › <b>${S.sel && S.view === 'tickets' ? 'Ticket' : TITLES[S.view]}</b>`;
@@ -299,7 +300,7 @@ async function vEquipo() {
   ${Object.entries(P).map(([k, l]) => `<tr><td>${esc(l)}</td><td class="no">No</td>${adm.map(u => u.perms.includes(k) ? '<td class="yes">Sí</td>' : '<td class="no">No</td>').join('')}</tr>`).join('')}
   </tbody></table></div></section>`;
 }
-const VIEWS = { registro: vRegistro, misreportes: vMisReportes, tickets: vTickets, tablero: vTablero, duplicados: vDuplicados, danados: vDanados, descartes: vDescartes, equipo: vEquipo };
+const VIEWS = { retornos: vRetornos, registro: vRegistro, misreportes: vMisReportes, tickets: vTickets, tablero: vTablero, duplicados: vDuplicados, danados: vDanados, descartes: vDescartes, equipo: vEquipo };
 
 /* ---------- Acciones ---------- */
 const fileData = f => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
@@ -321,7 +322,8 @@ function openTicket(id) { S.sel = Number(id); S.tab = 'chat'; S.ui = {}; if (S.v
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  if (e.target.id === 'scan') identify(e.target.value, 'scan');
+  if (e.target.id === 'return-query') { S.returnQuery = e.target.value.trim(); render(); }
+  else if (e.target.id === 'scan') identify(e.target.value, 'scan');
   else if (e.target.id === 'code') identify(e.target.value, 'code');
   else if (e.target.dataset && e.target.dataset.f && !$('#regbtn')?.disabled) { e.preventDefault(); register(); }
   else if (e.target.matches && e.target.matches('tr[data-a=open]')) openTicket(e.target.dataset.v);
@@ -344,6 +346,15 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-a]'); if (!el || el.tagName === 'SELECT') return;
   const a = el.dataset.a, v = el.dataset.v, R = S.R;
   switch (a) {
+    case 'return-search': S.returnQuery = $('#return-query').value.trim(); render(); break;
+    case 'return-ticket':
+      el.disabled = true;
+      try { const r = await api('POST', '/api/returns/' + encodeURIComponent(v) + '/ticket', {}); toast(r.appended ? 'Ya había un ticket abierto: ' + esc(r.folio) : 'Ticket creado: ' + esc(r.folio)); openTicket(r.id); }
+      catch (err) { toast(esc(err.message)); el.disabled = false; } break;
+    case 'return-status':
+      el.disabled = true;
+      try { await api('POST', '/api/returns/' + encodeURIComponent(v) + '/status', { status: document.getElementById('rs-' + v).value }); await render(); }
+      catch (err) { toast(esc(err.message)); el.disabled = false; } break;
     case 'logout': await api('POST', '/api/logout'); showLogin(); break;
     case 'scan': identify($('#scan').value, 'scan'); break;
     case 'usecode': identify($('#code').value, 'code'); break;
@@ -409,3 +420,12 @@ async function boot() {
   route();
 }
 boot();
+
+async function vRetornos() {
+ const data = await api('GET', '/api/returns');
+ const q = S.returnQuery || '';
+ const list = data.rows.filter(r => !q || [r.guide,r.carrier,r.rack,r.status].join(' ').toLowerCase().includes(q.toLowerCase()));
+ return '<div class="panel-h"><h1>Retornos escaneados</h1><a class="btn" href="'+esc(data.source)+'" target="_blank" rel="noopener noreferrer">Abrir Site original</a></div>' +
+ '<div class="banner warn"><div><b>'+(data.mode === 'demo' ? 'PRUEBA · datos ficticios' : 'Consulta privada del Site · hasta 2,000 retornos recientes')+'</b>'+(data.mode === 'demo' ? 'Los estados se reinician al detener el servidor. Los tickets son locales.' : 'Sheets alimenta Sites miércoles y sábados a las 19:30, hora México. Los estados reales se gestionan en el Site original.')+'<br>Consultado: '+esc(fdt(Date.parse(data.fetched_at)))+'</div></div>' +
+ '<section class="panel"><input id="return-query" aria-label="Buscar retornos" placeholder="Guía, paquetería, rack o estado" value="'+esc(q)+'"><button class="btn" data-a="return-search">Buscar / actualizar</button></section><section class="panel"><div class="tbl-wrap"><table><thead><tr><th>Guía</th><th>Paquetería</th><th>Rack</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>'+list.map(r => '<tr><td>'+esc(r.guide)+'</td><td>'+esc(r.carrier)+'</td><td>'+esc(r.rack ?? 'Sin asignar')+'</td><td>'+esc(r.status)+'</td><td>'+(isAdmin() ? '<button class="btn sm" data-a="return-ticket" data-v="'+esc(r.id)+'">Abrir ticket</button>' : 'Consulta')+(data.mode === 'demo' && can('resolve') ? '<select aria-label="Nuevo estado" id="rs-'+esc(r.id)+'">'+['recibido','acomodado','cerrado'].map(v => '<option '+(r.status===v?'selected':'')+'>'+v+'</option>').join('')+'</select><button class="btn sm" data-a="return-status" data-v="'+esc(r.id)+'">Guardar estado</button>' : '')+'</td></tr>').join('')+'</tbody></table>'+(list.length?'':'Sin resultados.')+'</div></section>';
+}

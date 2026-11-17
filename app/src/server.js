@@ -52,7 +52,8 @@ function createApp(db, opts = {}) {
 
   const me = u => ({ id: u.id, name: u.name, role: u.role, dept: u.dept, title: u.title, perms: dm.permsOf(u) });
   app.use('/api', auth);
-  app.get('/api/me', wrap(req => ({ ...me(req.user), types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
+  const returns = require('./returns').mountReturns(app, db, opts, now);
+  app.get('/api/me', wrap(req => ({ ...me(req.user), returns_mode: returns.mode, types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
 
   // ---------- Serialización ----------
   const names = () => Object.fromEntries(db.prepare('SELECT id, name FROM users').all().map(u => [u.id, u.name]));

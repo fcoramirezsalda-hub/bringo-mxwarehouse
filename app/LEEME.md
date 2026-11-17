@@ -83,6 +83,12 @@ Notas:
 - La hoja tiene datos de clientes: compártela solo con el equipo.
 - Si cambias el código del Apps Script, haz **Implementar → Gestionar implementaciones → Editar → Versión nueva** para que tome efecto.
 
+## Retornos escaneados (opcional, apagado)
+
+El menú "Retornos escaneados" está apagado por defecto. Para probarlo con datos ficticios, arranca el servidor con
+`RETURNS_MODE=demo` (en Windows: `set RETURNS_MODE=demo` antes de `npm start`). No escribe en la hoja ni en el Site.
+La conexión con datos reales está pendiente de aprobación (`docs/ADR-001-retornos.md`).
+
 ## Respaldos
 
 Todo vive en la carpeta `data\` (base de datos y evidencias). Cópiala a otro lugar al final de cada día.

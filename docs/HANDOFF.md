@@ -1,5 +1,15 @@
 # Handoff
 
+## 2026-11-17 (6) · Claude Code · retornos escaneados integrados (apagado por defecto)
+
+- Se integró el ZIP de prueba de Codex (`BrinGO-prueba-retornos-Claude.zip`, base 60aecc1), revisado y depurado. Detalle y opciones: `docs/ADR-001-retornos.md`.
+- Nuevo `app/src/returns.js` y menú "Retornos escaneados". Variable `RETURNS_MODE`: `off` (predeterminado), `demo`, `site`.
+  Con `off` la aplicación se comporta igual que v0.3.0. Sin cambios de esquema ni dependencias nuevas.
+- Abrir ticket desde un retorno crea un ticket "Otro" con la guía; si ya hay uno abierto, lo abre sin escribir nada.
+- Revisión de la hoja "Escaneo de Retornos" (solo lectura): la pestaña Registro no tiene rack ni estado; esos campos solo están en el Site.
+- Pruebas: `npm test` 15/15 (5 nuevas de retornos). Prueba en navegador (Chromium) con `off` y `demo`, como admin y operador: menú, búsqueda con Enter, abrir ticket; sin errores de consola.
+- Pendiente: el propietario elige la fuente real (recomendado: leer la hoja con cuenta de servicio de solo lectura). El modo `site` no se probó con datos reales.
+
 ## 2026-11-17 (5) · Claude Code · instalador arranca el sistema y lo comprueba
 
 - En la PC de la bodega el instalador terminó, pero http://localhost:8080 no respondía y no se vio Edge en el paso 6.
