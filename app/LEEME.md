@@ -24,9 +24,11 @@ firewall para la red privada, suspensión desactivada y la sesión de Bringgo/Ea
 
 ```
 npm install
-npx playwright install chromium
 npm run setup
 ```
+
+El agente usa Microsoft Edge, que ya viene con Windows 10/11. Solo si la PC no tiene Edge, descarga Chromium con
+`npx playwright install chromium` y define la variable `AGENT_BROWSER=chromium`.
 
 `npm run setup` crea la base de datos y muestra **un PIN de 4 dígitos para cada persona**. Anótalos y entrégalos en persona;
 no se vuelven a mostrar. Francisco R. puede restablecer cualquier PIN desde "Equipo y permisos".

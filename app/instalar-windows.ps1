@@ -22,9 +22,21 @@ Ok "Node.js $v"
 Paso '2/6 Dependencias'
 npm install --no-audit --no-fund
 if ($LASTEXITCODE -ne 0) { throw 'npm install falló. Revisa la conexión a internet.' }
-npx playwright install chromium
-if ($LASTEXITCODE -ne 0) { throw 'No se pudo descargar el navegador del agente.' }
 Ok 'Dependencias instaladas'
+# El agente usa Microsoft Edge, que ya viene con Windows. Solo si no está, se descarga Chromium.
+$edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($edge) { Ok 'Navegador del agente: Microsoft Edge (no hace falta descargar nada)' }
+else {
+  $env:PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT = '300000'
+  $okNav = $false
+  foreach ($i in 1..3) {
+    Write-Host "  Descargando Chromium para el agente (intento $i de 3)..."
+    npx playwright install chromium
+    if ($LASTEXITCODE -eq 0) { $okNav = $true; break }
+  }
+  if ($okNav) { $env:AGENT_BROWSER = 'chromium'; [Environment]::SetEnvironmentVariable('AGENT_BROWSER', 'chromium', 'User'); Ok 'Navegador del agente: Chromium' }
+  else { Aviso 'No se pudo descargar el navegador del agente. El resto se instala igual; instala Microsoft Edge o vuelve a correr este instalador con mejor conexión.' }
+}
 
 Paso '3/6 Base de datos y usuarios'
 if (Test-Path 'data\incidencias.db') { Ok 'Ya existe; no se cambió nada.' }

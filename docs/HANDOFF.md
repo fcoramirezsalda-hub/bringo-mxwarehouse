@@ -1,5 +1,16 @@
 # Handoff
 
+## 2026-11-17 (4) · Claude Code · instalador: no depender de descargar Chromium
+
+- En la PC de la bodega `npx playwright install chromium` se cortó por tiempo (descarga de 140 MB) y el instalador se detuvo.
+- Ahora el agente abre **Microsoft Edge** (ya viene con Windows) mediante `channel: 'msedge'` de Playwright. Si Edge no abre,
+  intenta con el Chromium de Playwright. `AGENT_BROWSER=chromium` fuerza Chromium.
+- `instalar-windows.ps1` solo descarga Chromium si no encuentra Edge: 3 intentos con 5 min de espera por conexión, y si falla
+  avisa y sigue con el resto de la instalación en vez de abortar.
+- La sesión guardada en `perfil-agente` es la misma carpeta; si ya se había iniciado sesión con Chromium, puede pedir volver a hacer `npm run agent:login`.
+
+**Pruebas:** `npm test` 10/10. No se pudo probar en Windows desde aquí: falta confirmar en la PC de la bodega que el paso 6 abre Edge.
+
 ## 2026-11-17 (3) · Claude Code · chat con fotos (v0.3.0) · rama `agente/claude/chat-evidencias`
 
 **Diseño**
