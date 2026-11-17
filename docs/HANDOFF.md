@@ -9,7 +9,7 @@
   Navegador: operador y admin, Enter del lector, repetida, Por identificar → corrección, rack, asignación, anulación, móvil sin desbordes.
   Datos reales: 328/328 coinciden con la hoja; con guías nuevas 83.5 % automático y 100 % de aciertos.
 - **No probado:** `Retornos.gs` en Google real (no hay acceso de escritura desde aquí). Probarlo primero en una **copia** de la hoja.
-- Pendiente: instalar en la PC de la bodega; saber si los racks tienen código de barras (DECISIONS, pendiente 11).
+- Pendiente: instalar en la PC de la bodega. Los racks no tienen código de barras (decisión del propietario): no se confirma el acomodo por escaneo.
 
 ## 2026-11-17 (7) · Claude Code · propuesta de escaneo de retornos con detección y racks
 

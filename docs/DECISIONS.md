@@ -24,6 +24,7 @@
 | 2026-11-15 | Mientras no haya nube autorizada, los tickets y su historial se copian cada minuto a una hoja de Google Sheets en el Drive del propietario (Apps Script con token). La base local sigue siendo la principal. | Propietario |
 | 2026-11-15 | Dañado o con escurrimiento: se re-empaca y se envía. No abre ticket para CS; queda en un registro de "Enviados dañados" con desenlace (pendiente, regresó, dispose de paquetería, entregado). | Propietario |
 | 2026-11-17 | Retornos se escanean en MX Wharehouse; la hoja "Escaneo de Retornos" es la copia (columna nueva J "Rack"); 10 racks por paquetería; el operador corrige la paquetería; Apps Script nuevo con token y el Sheets actual sigue funcionando. Ver ADR-002. | Propietario |
+| 2026-11-17 | Los racks no tienen código de barras: el rack se asigna solo por paquetería y el operador puede cambiarlo en pantalla (sin confirmación por escaneo). | Propietario |
 | 2026-11-17 | El módulo de retornos se integra apagado por defecto (`RETURNS_MODE=off`), solo lectura y sin escribir en la hoja ni en el Site. Ver ADR-001. | Claude Code (propuesta, confirmar) |
 | 2026-11-17 | Chat interno sin "tipo" de mensaje. Las fotos se envían desde el chat (texto, foto o ambos) y se quitó la pestaña Evidencias. Las fotos siguen siendo evidencias del expediente y no se borran. | Propietario |
 
@@ -38,5 +39,4 @@
 7. **Duplicado ES** con pantalla de selección de paquetería: ¿cuenta como "duplicado confirmado" desde que se reporta, o espera a que alguien lo confirme?
 8. **Regla de zonas** (≤ 5 kg y ≤ 60 cm → Zona 1): es un ejemplo. Hacen falta las tablas reales de tarifas.
 9. **Retornos:** ¿qué fuente real se usa? Recomendado: leer la hoja "Escaneo de Retornos" con una cuenta de servicio de solo lectura (ADR-001, opción B). La hoja no tiene rack ni estado; ¿se necesitan?
-11. **Racks:** ¿tienen o pueden tener etiqueta con código de barras? Si sí, se puede pedir confirmar el acomodo escaneando el rack.
 10. **Motivos que se resuelven en piso** (Guía no reconocida, Extra Dept, No use label): con el registro de 3 clicks hoy abren ticket. ¿Deben registrarse directo como "Resuelto en piso" (solo historial)?

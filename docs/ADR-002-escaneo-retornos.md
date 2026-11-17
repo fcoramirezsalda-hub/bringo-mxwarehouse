@@ -9,7 +9,7 @@
 
 1. Escanear en MX Wharehouse y la hoja como copia: **aprobado**.
 2. Guardado: **columna nueva "Rack"** en Registro (columna J).
-3. **10 racks, se acomodan por paquetería.** (No se respondió si tienen código de barras: el rack se asigna solo y el operador puede cambiarlo.)
+3. **10 racks, se acomodan por paquetería. No tienen código de barras:** el rack se asigna solo y el operador puede cambiarlo; no hay confirmación por escaneo.
 4. Corrige la paquetería: **el operador**.
 5. Apps Script nuevo con token: **sí**, y **el Sheets actual debe seguir funcionando**.
 
