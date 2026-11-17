@@ -49,11 +49,12 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 3.2 | Chat interno por ticket con tipos de instrucción | Claude Code | pendiente |
 | 3.3 | Propuesta de sincronización con Google Sheets de retornos | Claude Code → propietario | propuesta en `docs/ADR-001-retornos.md` |
 | 3.4 | Implementar la fuente real aprobada (adaptador `sheet`) | Claude Code | bloqueado: falta aprobación |
-| 3.6 | Propuesta: escanear retornos en MX Wharehouse, detección automática, racks y espejo en la hoja (`docs/ADR-002-escaneo-retornos.md`) | Claude Code → propietario | propuesta, espera aprobación |
-| 3.7 | R2.1 Detector `guias.js` (port de la hoja + dígitos verificadores) y backtest contra el historial | Claude Code | bloqueado: falta aprobación de ADR-002 |
-| 3.8 | R2.2 Pantalla "Escanear retorno", anti-duplicado y aprendizaje | Claude Code | bloqueado: falta aprobación de ADR-002 |
-| 3.9 | R2.3 Racks (sugerencia, confirmación por escaneo, movimientos) | Claude Code | bloqueado: faltan reglas de racks |
-| 3.10 | R2.4 Envío a "Escaneo de Retornos" con cola y reintentos | Claude Code | bloqueado: falta aprobación de ADR-002 |
+| 3.6 | Propuesta: escanear retornos en MX Wharehouse, detección automática, racks y espejo en la hoja (`docs/ADR-002-escaneo-retornos.md`) | Claude Code → propietario | aprobada 2026-11-17 |
+| 3.7 | R2.1 Detector `guias.js` (port de la hoja + verificador FedEx) y backtest contra el historial | Claude Code | hecho 2026-11-17 |
+| 3.8 | R2.2 Pantalla "Escanear retorno", anti-duplicado y aprendizaje | Claude Code | hecho 2026-11-17 |
+| 3.9 | R2.3 Racks por paquetería (10), cambio manual, anulación | Claude Code | hecho 2026-11-17 |
+| 3.10 | R2.4 Envío a "Escaneo de Retornos" (Apps Script nuevo, columna J Rack) con cola y reintentos | Claude Code | hecho 2026-11-17 |
+| 3.11 | R2.5 Instalar Retornos.gs, `npm run retornos:setup` en la PC de la bodega y piloto | Propietario + Claude Code | pendiente |
 | 3.5 | Menú "Retornos escaneados" (apagado por defecto, demo, abrir ticket) a partir del ZIP de Codex | Claude Code | hecho 2026-11-17 |
 
 ## Hecho

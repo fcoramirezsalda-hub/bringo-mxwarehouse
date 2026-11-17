@@ -1,9 +1,43 @@
 # ADR-002: Escaneo de retornos en MX Wharehouse con detección automática de paquetería y acomodo por racks
 
-**Estado:** Propuesta · espera aprobación del propietario (incluye tablas nuevas y escritura en Google Sheets)
+**Estado:** Aceptada por el propietario el 2026-11-17 · implementada (R2.1–R2.4), apagada hasta configurarla en la PC de la bodega
 **Fecha:** 2026-11-17
 **Decide:** Propietario
 **Relacionado:** ADR-001 (consulta de retornos, apagado por defecto)
+
+## Respuestas del propietario (2026-11-17)
+
+1. Escanear en MX Wharehouse y la hoja como copia: **aprobado**.
+2. Guardado: **columna nueva "Rack"** en Registro (columna J).
+3. **10 racks, se acomodan por paquetería.** (No se respondió si tienen código de barras: el rack se asigna solo y el operador puede cambiarlo.)
+4. Corrige la paquetería: **el operador**.
+5. Apps Script nuevo con token: **sí**, y **el Sheets actual debe seguir funcionando**.
+
+## Implementación (2026-11-17)
+
+| Pieza | Archivo |
+|---|---|
+| Detector (port fiel + veto por dígito verificador FedEx) | `app/src/guias.js` |
+| Escaneo, racks, anulación, sincronización con la hoja | `app/src/retornos-escaneo.js` |
+| Apps Script nuevo (independiente del actual) | `app/integraciones/google-sheets/Retornos.gs` |
+| Pantalla "Escanear retorno" (operadores y admins) + racks por paquetería (admin con "Administrar usuarios") | `app/public/app.js` |
+| Pruebas (incluye `Retornos.gs` ejecutado contra una hoja simulada) | `app/test/guias.test.js`, `app/test/retornos-escaneo.test.js` |
+
+Hallazgos que cambiaron el diseño:
+- En Registro, **D (Mes), G (Control) e I (Clave única) son fórmulas que se extienden desde la fila 2** (`ARRAYFORMULA`/`MAP`).
+  Escribir en ellas las rompería; `Retornos.gs` escribe solo A, B, C, E, F, H y J, y busca la última fila por la columna B (no `getLastRow`).
+- Las escrituras de un script no disparan el `onEdit` del script actual ni las validaciones de B y C: MX envía ya la paquetería y el método.
+- Para reintentos sin duplicar, `Retornos.gs` guarda en una pestaña oculta "MX Wharehouse" qué fila escribió cada escaneo.
+- Dígito verificador FedEx (12 dígitos): 15/15 FedEx reales lo cumplen, pero 1 de 2 PaqueteExpress también (por azar).
+  Se usa solo como **veto** (si no cumple, no puede ser FedEx) y como rasgo del modelo, nunca para asignar FedEx por sí solo.
+
+Medición con datos reales (328 filas de Registro + Catálogo de guías, sin Referencias BrinGO):
+- Coincidencia con la hoja: **328/328**.
+- Guías nuevas (cada guía se quita del catálogo antes de detectarla): asigna **83.5 %** automáticamente con **100 %** de aciertos;
+  el resto queda "Por identificar" para que el operador elija.
+
+Racks iniciales (propuesta por volumen; se cambian en pantalla): PaqueteExpress → Rack 1, FedEx → 2, Estafeta → 3, DHL → 4, J&T → 5,
+iMile → 6, UPS → 7, Correos de México / Castores / Afimex → 8, Cliente / RMA → 9, Por identificar → 10.
 
 ## Contexto
 

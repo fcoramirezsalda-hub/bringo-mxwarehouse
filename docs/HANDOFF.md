@@ -1,5 +1,16 @@
 # Handoff
 
+## 2026-11-17 (8) · Claude Code · escaneo de retornos con detección, racks y copia a la hoja (v0.5.0)
+
+- Implementado ADR-002 (aprobado): menú "Escanear retorno", `guias.js`, `retornos-escaneo.js`, `Retornos.gs`. Ver el ADR para el detalle.
+- Tablas nuevas (solo se agregan): racks, rack_assign, return_scans, return_events, guide_refs, guide_rules, sheet_registro, returns_state.
+- Apagado por defecto: se activa con `npm run retornos:setup` (o `RETURNS_SCAN=on`). Sin hoja configurada guarda solo en la PC.
+- Pruebas: `npm test` 26/26. `Retornos.gs` se ejecuta contra una hoja simulada (no toca D/G/I, reintentos sin duplicar, respeta escaneos directos).
+  Navegador: operador y admin, Enter del lector, repetida, Por identificar → corrección, rack, asignación, anulación, móvil sin desbordes.
+  Datos reales: 328/328 coinciden con la hoja; con guías nuevas 83.5 % automático y 100 % de aciertos.
+- **No probado:** `Retornos.gs` en Google real (no hay acceso de escritura desde aquí). Probarlo primero en una **copia** de la hoja.
+- Pendiente: instalar en la PC de la bodega; saber si los racks tienen código de barras (DECISIONS, pendiente 11).
+
 ## 2026-11-17 (7) · Claude Code · propuesta de escaneo de retornos con detección y racks
 
 - Solo documentación: `docs/ADR-002-escaneo-retornos.md`. Sin cambios de código.

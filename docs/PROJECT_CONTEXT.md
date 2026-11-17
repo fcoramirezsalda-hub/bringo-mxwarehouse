@@ -39,7 +39,8 @@ Decisión 2026-11-15: MVP nuevo e independiente (el repositorio del WMS original
 | Sesión | Usuario + PIN de 4 dígitos (scrypt), cookie HttpOnly de 14 h, bloqueo tras 5 intentos |
 | Agente de búsqueda | Proceso aparte `app/src/worker.js` + `app/src/connectors.js` (Playwright, solo lectura) |
 | Evidencias | Archivos en `app/data/evidencias/<ticket>/`, sin borrado desde la aplicación |
-| Retornos | `app/src/returns.js`, solo lectura, `RETURNS_MODE=off` por defecto (ADR-001) |
+| Retornos (consulta del Site) | `app/src/returns.js`, solo lectura, `RETURNS_MODE=off` por defecto (ADR-001) |
+| Escaneo de retornos | `app/src/retornos-escaneo.js` + `guias.js` (detección), 10 racks; copia a "Escaneo de Retornos" con `integraciones/google-sheets/Retornos.gs` (ADR-002). Apagado hasta `npm run retornos:setup` |
 | Pruebas | `npm test` (node:test) |
 
 

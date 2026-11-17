@@ -53,7 +53,8 @@ function createApp(db, opts = {}) {
   const me = u => ({ id: u.id, name: u.name, role: u.role, dept: u.dept, title: u.title, perms: dm.permsOf(u) });
   app.use('/api', auth);
   const returns = require('./returns').mountReturns(app, db, opts, now);
-  app.get('/api/me', wrap(req => ({ ...me(req.user), returns_mode: returns.mode, types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
+  const rscan = require('./retornos-escaneo').mount(app, db, opts, now);
+  app.get('/api/me', wrap(req => ({ ...me(req.user), returns_mode: returns.mode, returns_scan: rscan.enabled, types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
 
   // ---------- Serialización ----------
   const names = () => Object.fromEntries(db.prepare('SELECT id, name FROM users').all().map(u => [u.id, u.name]));
@@ -213,6 +214,7 @@ if (require.main === module) {
   setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
   dm.runDeadlines(db);
   require('./sheets-sync').start(db);
+  if (require('./retornos-escaneo').enabled()) require('./retornos-escaneo').start(db);
   app.listen(port, '0.0.0.0', () => {
     const ips = Object.values(require('os').networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
     console.log(`MX Wharehouse · incidencias en http://localhost:${port}`);

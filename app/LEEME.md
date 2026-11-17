@@ -83,6 +83,20 @@ Notas:
 - La hoja tiene datos de clientes: compártela solo con el equipo.
 - Si cambias el código del Apps Script, haz **Implementar → Gestionar implementaciones → Editar → Versión nueva** para que tome efecto.
 
+## Escanear retornos (opcional, apagado hasta configurarlo)
+
+Menú "Escanear retorno": el lector Eyoyo escanea la guía, MX Wharehouse detecta la paquetería (mismo sistema que la hoja
+"Escaneo de Retornos"), indica el rack y lo copia a la hoja con la columna nueva "Rack" (J). El script actual de la hoja no se toca.
+
+1. Crea un proyecto **nuevo** en script.google.com y pega `integraciones/google-sheets/Retornos.gs` (no edites "Escaneo Retornos — Eyoyo").
+2. En la PC de la bodega: `npm run retornos:setup`. Muestra el TOKEN y el RETORNOS_ID que van en las propiedades del script.
+3. Implementa el script como aplicación web (Ejecutar como: Yo · Acceso: Cualquier usuario) y pega la URL `/exec`.
+   El setup lee la hoja, muestra cuántas guías coinciden con la detección y activa el menú. Reinicia `npm start`.
+
+- Sin internet se sigue escaneando; la hoja se pone al día sola (cada 30 s) y cada 5 min se lee el catálogo, las reglas y lo escaneado directo en la hoja.
+- Durante el piloto, escanear **solo** en MX Wharehouse (no en la hoja al mismo tiempo).
+- Para apagarlo: `set RETURNS_SCAN=off` antes de `npm start` (lo ya escaneado sigue en la hoja).
+
 ## Retornos escaneados (opcional, apagado)
 
 El menú "Retornos escaneados" está apagado por defecto. Para probarlo con datos ficticios, arranca el servidor con
