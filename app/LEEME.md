@@ -70,7 +70,7 @@ para respaldo y para que Customer Service pueda consultarlos desde fuera de la b
 1. En Google Drive crea una hoja de cálculo vacía, por ejemplo "MX Wharehouse · Tickets de incidencias".
 2. En la hoja: **Extensiones → Apps Script**. Borra lo que haya y pega el contenido de `integraciones\google-sheets\Codigo.gs`. Guarda.
 3. En esta PC, en la carpeta `app`, da doble clic a **configurar-sheets.bat** (o ejecuta `npm run sheets:setup` **dentro de la carpeta `app`**).
-   Muestra un **TOKEN** y se queda esperando la URL del paso 5: no cierres la ventana. Si la cierras, vuelve a abrirla; el TOKEN es el mismo.
+   Muestra un **TOKEN** y se queda esperando la URL del paso 5: no cierres la ventana. Si la cierras antes de pegar la URL, al abrirla otra vez sale un TOKEN nuevo: actualízalo en Apps Script (paso 4).
 4. En Apps Script: **Configuración del proyecto (engrane) → Propiedades de la secuencia de comandos → Agregar propiedad**:
    nombre `TOKEN`, valor el que mostró el paso 3.
    Después, en la barra de arriba elige la función **probar** y presiona **Ejecutar**: la primera vez Google pide permisos
