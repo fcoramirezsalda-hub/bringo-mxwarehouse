@@ -12,7 +12,7 @@
 - Arreglo menor: `route()` ya no falla si cambia el `#` de la dirección en la pantalla de inicio de sesión.
 - Pruebas: `npm test` 30/30 (nueva: reabrir con permisos e historial). Navegador: resolver → Reabrir desde el aviso → En gestión;
   Reabrir en fila y detalle; Pamela no ve Reabrir en un ticket que resolvió Samantha; sin errores de consola.
-- Demo regenerada; falta publicarla.
+- Demo regenerada y publicada en el link permanente (versión 21 del artifact).
 
 ## 2026-11-17 (10) · Claude Code · bandeja: buscador, filtros reducidos y resolución rápida (v0.6.0)
 
