@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-11-17 (2) · Claude Code · demo publicada de la plataforma real
+
+- El link del panel "MX Wharehouse" (https://claude.ai/artifact/AohXAPkYV8vAeoeb1g1zCy) ya no muestra la maqueta vieja:
+  muestra la interfaz real v0.2.0 con un servidor simulado en el navegador (`demo/`). PIN de prueba 1234.
+- Probado en navegador: login (PIN malo y bueno), registro en 3 clics, bandeja, tomar ticket, evidencia, tablero,
+  duplicados, enviados dañados, descartes, equipo, sesión tras recargar, 400 px sin scroll horizontal, sin errores.
+- La maqueta anterior sigue en `prototype/mx-wharehouse.html`.
+
 ## 2026-11-17 · Claude Code · versión visible (v0.2.0)
 
 - La versión (`app/package.json`, ahora 0.2.0) se muestra en el inicio de sesión y en la barra lateral, vía `GET /api/version`.

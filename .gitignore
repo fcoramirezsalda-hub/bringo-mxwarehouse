@@ -5,3 +5,4 @@ perfil-agente/
 capturas/
 .env
 *.zip
+demo/dist/
