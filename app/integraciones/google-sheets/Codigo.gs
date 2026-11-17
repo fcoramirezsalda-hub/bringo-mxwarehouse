@@ -4,7 +4,19 @@
  * Propiedades de la secuencia de comandos: TOKEN = (el que muestra "npm run sheets:setup").
  * Implementar → Nueva implementación → Aplicación web → Ejecutar como: Yo · Acceso: Cualquier usuario.
  * Sin el TOKEN correcto no escribe nada.
+ * No uses "Ejecutar" ni "Depurar" con doPost: se ejecuta solo cuando la PC envía datos.
+ * Para revisar la configuración, elige "probar" en la lista de funciones y presiona Ejecutar.
  */
+
+/** Revisa la configuración y pide los permisos de Google. Ejecútala desde el editor. */
+function probar() {
+  var token = PropertiesService.getScriptProperties().getProperty('TOKEN');
+  if (!token) { Logger.log('FALTA el TOKEN: Configuración del proyecto → Propiedades de la secuencia de comandos → TOKEN.'); return; }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) { Logger.log('Este script debe abrirse desde la hoja: Extensiones → Apps Script.'); return; }
+  Logger.log('Todo bien: TOKEN guardado y acceso a la hoja "' + ss.getName() + '". Ahora: Implementar → Nueva implementación → Aplicación web.');
+}
+
 function doPost(e) {
   var out = function (r) { return ContentService.createTextOutput(JSON.stringify(r)).setMimeType(ContentService.MimeType.JSON); };
   var body;
