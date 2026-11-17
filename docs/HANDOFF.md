@@ -8,7 +8,7 @@
 - **Diseño:** barra superior + menú horizontal (antes barra lateral), contenedor centrado de 1440 px, paleta estilo Vuexy, fuente Public Sans.
   Oscuro por defecto; botón ☀/☾ para el tema claro. Idioma y tema se guardan en cada PC (localStorage). CSS propio, sin plantilla ni dependencias.
 - app.js: solo cambios de presentación (meses según idioma, login, formulario de alta, `translate="no"`, botones de idioma/tema). Sin cambios de API ni de servidor.
-- Demo: `demo/build.js` incluye i18n.js y el script de tema. Regenerada; **falta volver a publicarla** en el link permanente.
+- Demo: `demo/build.js` incluye i18n.js y el script de tema. Regenerada y publicada en el link permanente (versión 22 del artifact).
 - **Pruebas:** `npm test` sin fallas. Playwright sobre la demo: login ES/EN, bandeja, equipo, registro y detalle en oscuro/claro y ES/EN; 1360 px y 390 px
   sin scroll horizontal; el selector "Respuesta pendiente de" envía el valor en español; sin errores de consola.
 - **Falta:** visto bueno del propietario sobre colores/menú; decidir si idioma y tema van por persona (DECISIONS pendiente 13); el banner de la demo sigue solo en español.
