@@ -25,12 +25,17 @@
     'MX-2900440': { source: 'Bringgo · Accept goods', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['Product Name', 'EVER ADVANCED Rolling Ball Storage Cart'], ['W.T No', 'MX-2900440'], ['ASIN', 'B0BPYBDTC6'], ['Quantity', '1']] },
     '191255213580': { source: 'Bringgo · Item Look Up · Outbound Tracking Number', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['W.H CODE', 'MX-2900440'], ['PRODUCT NAME', 'EVER ADVANCED Rolling Ball Storage Cart'], ['ASIN', 'B0BPYBDTC6'], ['SELLER ACCOUNT ORDER NO', '701-9461183-8702647'], ['OUTBOUND TRACKING', '191255213580 | Delivered']] },
     'MX-3015532': { source: 'Bringgo · Accept goods', code: 'MX-3015532', product: 'Hydro Flask 32 oz Wide Mouth', fields: [['Product Name', 'Hydro Flask 32 oz Wide Mouth'], ['W.T No', 'MX-3015532'], ['ASIN', 'B083GBK6S2'], ['Quantity', '1'], ['Destino · City', 'Querétaro']] },
+    'ES-4748635': { source: 'EasyShip · Orden', code: 'ES-4748635', product: null, fields: [['Orden EasyShip', '#4748635 · PRE_LABEL_CREATED'], ['Usuario', '#15589'], ['Paquetería', 'PAQUETEXPRESS > STANDARD'], ['Peso', '0.60 lbs']] },
     'ES-118412': { source: 'EasyShip · Item lookup', code: 'ES-118412', product: 'Olaplex No. 3 Hair Perfector 100 ml', fields: [['Orden EasyShip', '#4442683 · Delivered'], ['Producto', 'Olaplex No. 3 Hair Perfector 100 ml'], ['ASIN', 'B00SNM5US4'], ['Tracking ID', '8055420177'], ['Seller Order', '701-6636277-7159417'], ['Buyer Order', '114-7881374-5366648']] },
   };
 
   const now = () => Date.now();
   const folio = id => 'INC-' + String(id).padStart(4, '0');
   const normCode = v => { const m = String(v || '').trim().match(/^(MX|ES)[\s-]?(\d{5,})$/i); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+  const parseCode = v => { const s = String(v || '').trim(); const m = s.match(/^#?(\d{6,9})$/); return normCode(s) || (m ? m[1] : null); };
+  const isBare = c => /^\d+$/.test(String(c || ''));
+  const platOf = c => (/^(MX|ES)-/.test(String(c || '')) ? c.slice(0, 2) : null);
+  const codeKeys = c => !c ? [] : isBare(c) ? [c, 'MX-' + c, 'ES-' + c] : [c, c.slice(3)];
   const isOpen = t => !CLOSED.includes(t.status);
   class E extends Error { constructor(s, m) { super(m); this.status = s; } }
   const fail = (s, m) => { throw new E(s, m); };
@@ -77,7 +82,7 @@
     const type = String(b.type || ''); if (!TYPES[type]) fail(400, 'Elige un motivo válido.');
     const nolabel = !!b.nolabel; let code = null, trk = null;
     if (!nolabel) {
-      if (b.code) { code = normCode(b.code); if (!code) fail(400, 'El código debe ser MX-0000000 o ES-000000.'); }
+      if (b.code) { code = parseCode(b.code); if (!code) fail(400, 'El código debe ser MX-0000000, ES-0000000 o solo el número (ej. 4748635).'); }
       if (b.trk) { trk = String(b.trk).replace(/\s+/g, '').slice(0, 60); if (trk.length < 6) fail(400, 'La guía es muy corta.'); }
       if (!code && !trk) fail(400, 'Escanea una guía o teclea el código MX/ES.');
     } else if (type !== 'sinetiqueta' && type !== 'otro') fail(400, 'Un paquete sin etiqueta solo puede ser "Sin etiqueta" u "Otro".');
@@ -85,11 +90,11 @@
     if (type === 'otro' && !other) fail(400, 'Especifica el motivo.');
     if (nolabel && !desc) fail(400, 'Describe el producto (no tiene código).');
     if (!nolabel) {
-      const ex = DB.tickets.find(t => isOpen(t) && t.type === type && ((code && t.code === code) || (trk && t.trk === trk)));
+      const ex = DB.tickets.find(t => isOpen(t) && t.type === type && ((code && codeKeys(code).includes(t.code)) || (trk && t.trk === trk)));
       if (ex) { event(ex, u, 'evento', 'Evento adicional registrado' + (other ? ': ' + other : ''), at); return { id: ex.id, folio: folio(ex.id), appended: true, status: ex.status }; }
     }
     const dmg = type === 'danado';
-    const t = { id: ++DB.seq, code, trk, plat: code ? code.slice(0, 2) : null, nolabel, type, other_text: other || null, description: desc || null,
+    const t = { id: ++DB.seq, code, trk, plat: platOf(code), nolabel, type, other_text: other || null, description: desc || null,
       status: dmg ? 'Enviado dañado' : 'Abierto', reporter_id: u.id, reporter_dept: u.role === 'admin' ? u.dept : 'Operación', owner_id: null,
       waiting_dept: null, location: dmg ? 'Enviado con paquetería' : 'Mesa de incidencias', created_at: at, due_at: at + 3 * D, damage_outcome: dmg ? 'Pendiente' : null, enr_status: 'na' };
     DB.tickets.push(t);
@@ -128,9 +133,9 @@
     DB.hb = now();
     for (const j of DB.jobs) {
       if (j.status !== 'pending' || j.ready > now()) continue;
-      const t = tk(j.ticket_id), r = FAKE[j.code] || FAKE[j.trk];
-      if (r) { Object.assign(t, { enr_status: 'lista', enr_source: r.source, enr_data: { product: r.product, fields: r.fields, candidates: [] }, enr_at: j.ready }); if (!t.code) { t.code = r.code; t.plat = r.code.slice(0, 2); } event(t, null, 'agente', 'Agente de búsqueda: información obtenida de ' + r.source, j.ready); }
-      else { const tried = j.code ? [j.code.startsWith('MX') ? 'Bringgo · Accept goods' : 'EasyShip · Item lookup'] : ['Bringgo · Item Look Up', 'EasyShip · Item lookup'];
+      const t = tk(j.ticket_id), r = isBare(j.code) ? (FAKE['MX-' + j.code] || FAKE['ES-' + j.code]) : (FAKE[j.code] || FAKE[j.trk]);
+      if (r) { Object.assign(t, { enr_status: 'lista', enr_source: r.source, enr_data: { product: r.product, fields: r.fields, candidates: [] }, enr_at: j.ready }); if (!t.code || isBare(t.code)) { if (isBare(t.code)) event(t, null, 'agente', `Agente de búsqueda: el número ${t.code} es ${r.code}`, j.ready); t.code = r.code; t.plat = r.code.slice(0, 2); } event(t, null, 'agente', 'Agente de búsqueda: información obtenida de ' + r.source, j.ready); }
+      else { const tried = isBare(j.code) ? ['Bringgo · Accept goods (MX-' + j.code + ')', 'EasyShip · Orden (ES-' + j.code + ')'] : j.code ? [j.code.startsWith('MX') ? 'Bringgo · Accept goods' : 'EasyShip · Orden'] : ['Bringgo · Item Look Up', 'EasyShip · Item lookup'];
         Object.assign(t, { enr_status: 'sin', enr_source: null, enr_data: { tried }, enr_at: j.ready }); event(t, null, 'agente', 'Agente de búsqueda: sin coincidencias en ' + tried.join(', '), j.ready); }
       DB.events[DB.events.length - 1].who = 'Agente de búsqueda'; j.status = 'done';
     }
@@ -169,7 +174,7 @@
     agent(); deadlines();
     if (p === '/api/me') return { ...me(u), types: TYPES, perms_catalog: PERMS, depts: DEPTS, tags: TAGS, outcomes: OUTCOMES };
     if (p === '/api/incidents' && method === 'POST') return create(u, body);
-    if (p === '/api/incidents/check') { const c = normCode(q.code), tr = q.trk; return DB.tickets.filter(t => isOpen(t) && ((c && t.code === c) || (tr && t.trk === tr))).map(t => ({ folio: folio(t.id), type_label: TYPES[t.type], has_owner: !!t.owner_id })); }
+    if (p === '/api/incidents/check') { const c = parseCode(q.code), tr = q.trk; return DB.tickets.filter(t => isOpen(t) && ((c && codeKeys(c).includes(t.code)) || (tr && t.trk === tr))).map(t => ({ folio: folio(t.id), type_label: TYPES[t.type], has_owner: !!t.owner_id })); }
     if (p === '/api/my-reports') return DB.tickets.filter(t => t.reporter_id === u.id && t.status !== 'Descartado').sort((a, b) => b.id - a.id).map(t => { const r = row(t); return { folio: r.folio, code: r.code, trk: r.trk, type_label: r.type_label, created_at: r.created_at, owner: r.owner, status: r.status }; });
     if (p === '/api/agent-status') return { online: true, last_seen: DB.hb, note: 'Demo', queue: DB.jobs.filter(j => j.status === 'pending').length };
     if (p === '/api/sheets-status') return { configured: false, last_ok_at: null, last_error: null };
@@ -222,7 +227,7 @@
       case 'discard': { need(u, 'discard'); if (body.confirm !== true) fail(400, 'Falta la segunda confirmación.'); const r = String(body.reason || '').trim(); if (r.length < 10) fail(400, 'La justificación es obligatoria (mínimo 10 caracteres).'); if (t.status === 'Descartado') fail(409, 'Ya está descartado.'); Object.assign(t, { status_before_discard: t.status, status: 'Descartado', discarded_by: u.id, discarded_at: now(), discard_reason: r }); event(t, u, 'descarte', 'Descartó la incidencia: ' + r); break; }
       case 'restore': { need(u, 'restore'); if (t.status !== 'Descartado') fail(409, 'El ticket no está descartado.'); t.status = t.status_before_discard || 'Abierto'; event(t, u, 'descarte', 'Restauró la incidencia descartada'); break; }
       case 'damage-outcome': { needAdmin(u); if (!OUTCOMES.includes(body.outcome)) fail(400, 'Desenlace no válido.'); if (t.type !== 'danado') fail(404, 'No es un envío dañado.'); t.damage_outcome = body.outcome; event(t, u, 'danado', 'Desenlace del envío dañado: ' + body.outcome); break; }
-      case 'research': { needAdmin(u); const v = String(body.value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.'); const c = normCode(v); if (c) { t.code = c; t.plat = c.slice(0, 2); } else t.trk = v.replace(/\s+/g, ''); event(t, u, 'agente', 'Pidió nueva búsqueda con ' + v); enqueue(t); break; }
+      case 'research': { needAdmin(u); const v = String(body.value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.'); const c = parseCode(v); if (c) { t.code = c; t.plat = platOf(c); } else t.trk = v.replace(/\s+/g, ''); event(t, u, 'agente', 'Pidió nueva búsqueda con ' + v); enqueue(t); break; }
       default: fail(404, 'No existe.');
     }
     return { ok: true };

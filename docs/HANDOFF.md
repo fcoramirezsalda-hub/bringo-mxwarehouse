@@ -1,5 +1,23 @@
 # Handoff
 
+## 2026-11-17 (9) · Claude Code · MX/ES sin prefijo y orden de EasyShip (v0.5.1)
+
+- Pedido del propietario: poder teclear `4748635` en lugar de `ES-4748635`.
+- En "Teclea el código MX o ES" ahora vale el número solo (6–9 dígitos, también `#4748635`). Queda como "Por identificar"
+  y el agente lo busca como `MX-…` en Bringgo y como `ES-…` en EasyShip; al encontrarlo completa el código y la plataforma
+  y deja un evento ("el número 4748635 es ES-4748635"). Si aparece en las dos, muestra ambas como candidatos y no elige.
+- Un número **escaneado** en el campo de guía se sigue tratando como guía (las guías también son numéricas).
+- Anti-duplicado y aviso de "ya hay ticket abierto": `4748635`, `MX-4748635` y `ES-4748635` cuentan como el mismo paquete.
+- "Buscar de nuevo" (detalle del ticket) también acepta el número solo. Ojo: ahí un número de 6–9 dígitos se toma como código, no como guía.
+- Nuevo lector `easyOrder` en `connectors.js`: abre `https://warehouse.easyshipping.cloud/prepare-v2/<número>/` (pantalla de la captura del
+  propietario) y lee estado, usuario, paquetería, peso, orden Amazon y ASIN. Solo lectura. Si no abre, usa Item lookup como antes.
+- Sin migración: el número solo se guarda en `tickets.code` sin prefijo y `plat` NULL hasta que el agente lo identifica.
+- Demo (`demo/mock-api.js`) actualizada; dato de prueba `4748635` → ES-4748635.
+- Pruebas: `npm test` 27/27 (nueva: número solo, agrupación con ES-, completar prefijo, sin coincidencias conserva el número).
+  Navegador (demo, 420 px): teclear 4748635 muestra "Por identificar · Número tecleado" y el aviso de búsqueda; sin errores de consola.
+- **No probado:** `easyOrder` contra EasyShip real (no hay sesión desde aquí). Los textos que lee salen de la captura; revisar en la PC de la
+  bodega con `HEADLESS=false` y, si algo no se llena, mandar captura.
+
 ## 2026-11-17 (8) · Claude Code · escaneo de retornos con detección, racks y copia a la hoja (v0.5.0)
 
 - Implementado ADR-002 (aprobado): menú "Escanear retorno", `guias.js`, `retornos-escaneo.js`, `Retornos.gs`. Ver el ADR para el detalle.

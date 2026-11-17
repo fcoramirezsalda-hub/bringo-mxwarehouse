@@ -9,6 +9,8 @@ const H = 3600e3, D = 24 * H;
 const dur = ms => { ms = Math.abs(ms); const d = Math.floor(ms / D), h = Math.floor(ms % D / H), m = Math.floor(ms % H / 60e3); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 const codeRe = /^(MX|ES)[\s-]?(\d{5,})$/i;
 const normCode = v => { const m = String(v || '').trim().match(codeRe); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+// En el campo de código también vale solo el número (4748635): el agente averigua si es MX o ES.
+const parseCode = v => { const s = String(v || '').trim(); const m = s.match(/^#?(\d{6,9})$/); return normCode(s) || (m ? m[1] : null); };
 
 const S = { rs: { last: null, err: null, q: '', rows: [] }, me: null, view: 'registro', sel: null, tab: 'chat', R: null, last: null, ui: {}, fl: { status: 'abiertos', type: '', owner: '', plat: '', due: '', enr: '' }, users: [], cache: {} };
 
@@ -89,9 +91,10 @@ function newR() { return { step: 1, f: {}, err: null }; }
 async function identify(raw, how) {
   const R = S.R || (S.R = newR()); const v = String(raw || '').trim(); R.err = null; S.last = null;
   if (!v) { R.err = how === 'code' ? 'Teclea el código MX o ES.' : 'Escanea o escribe la guía.'; return render(); }
-  const nc = normCode(v);
-  if (how === 'code' && !nc) { R.err = `“${v}” no tiene formato de código MX o ES (ej. MX-3015532).`; R.focusCode = true; return render(); }
-  Object.assign(R, nc ? { code: nc, plat: nc.slice(0, 2), trk: null, src: 'Código tecleado' } : { code: null, plat: null, trk: v.replace(/\s+/g, ''), src: 'Guía escaneada' }, { step: 2, type: null, f: {}, nolabel: false, existing: [] });
+  // Un número escaneado es una guía; en el campo de código, un número solo es un MX/ES sin prefijo.
+  const nc = how === 'code' ? parseCode(v) : normCode(v), bare = /^\d+$/.test(nc || '');
+  if (how === 'code' && !nc) { R.err = `“${v}” no tiene formato de código MX o ES (ej. MX-3015532 o solo 4748635).`; R.focusCode = true; return render(); }
+  Object.assign(R, nc ? { code: nc, plat: bare ? null : nc.slice(0, 2), trk: null, src: bare ? 'Número tecleado' : 'Código tecleado' } : { code: null, plat: null, trk: v.replace(/\s+/g, ''), src: 'Guía escaneada' }, { step: 2, type: null, f: {}, nolabel: false, existing: [] });
   try { R.existing = await api('GET', '/api/incidents/check?' + new URLSearchParams(R.code ? { code: R.code } : { trk: R.trk })); } catch {}
   render();
 }
@@ -113,12 +116,12 @@ function vRegistro() {
     ${s === 1 ? `<div class="field"><label class="lbl" for="scan">Escanea la guía</label>
       <div class="scanrow" style="margin-top:0"><input id="scan" class="scaninput" type="text" autocomplete="off" spellcheck="false" placeholder="ID…"><button class="btn brand" data-a="scan">Buscar</button></div></div>
       <div class="or">¿No escanea o el número no es válido?</div>
-      <div class="field"><label class="lbl" for="code">Teclea el código MX o ES con problema</label>
-      <div class="row"><input id="code" class="codeinput" type="text" autocomplete="off" spellcheck="false" placeholder="MX-0000000"><button class="btn brand" data-a="usecode">Usar código</button></div></div>
+      <div class="field"><label class="lbl" for="code">Teclea el código MX o ES con problema · con o sin “MX-”/“ES-”</label>
+      <div class="row"><input id="code" class="codeinput" type="text" autocomplete="off" spellcheck="false" placeholder="MX-0000000 o solo el número"><button class="btn brand" data-a="usecode">Usar código</button></div></div>
       ${R && R.err ? `<p class="err" role="alert">${esc(R.err)}</p>` : ''}
       <div class="row"><button class="btn ghost-danger" data-a="nolabel">El paquete no tiene etiqueta</button></div>`
     : `<div class="row"><span class="code">${esc(R.nolabel ? 'Sin etiqueta' : R.code || R.trk)}</span>${R.nolabel ? '' : platChip(R.plat)}<span class="chip neutral">${esc(R.src)}</span></div>
-      <p class="small muted">${R.nolabel ? 'Sin código: se identifica por descripción.' : 'La información de la orden la agrega el agente de búsqueda al ticket en unos minutos.'}</p>
+      <p class="small muted">${R.nolabel ? 'Sin código: se identifica por descripción.' : /^\d+$/.test(R.code || '') ? `Sin MX/ES: el agente lo busca como MX-${esc(R.code)} en Bringgo y como ES-${esc(R.code)} en EasyShip y completa el código.` : 'La información de la orden la agrega el agente de búsqueda al ticket en unos minutos.'}</p>
       ${R.existing && R.existing.length ? `<div class="banner warn"><span class="ic">!</span><div><b>Ya hay ${R.existing.length === 1 ? 'un ticket abierto' : R.existing.length + ' tickets abiertos'} para ${esc(R.code || R.trk)}</b>${R.existing.map(t => `${t.folio} · ${esc(t.type_label)}`).join('<br>')}<br>Si registras el mismo motivo, se agrega a ese expediente.</div></div>` : ''}`}
   </section>
   <section class="stepcard ${cls(2)}">
@@ -177,7 +180,7 @@ async function vTickets() {
 }
 function orderPanel(t) {
   const h = '<div class="panel-h"><h3>Información de la orden</h3><span class="sp"></span>';
-  const box = `<div class="row" style="margin-top:10px"><input type="text" id="recode" class="mono" placeholder="MX-0000000, ES-000000 o guía" style="flex:1 1 200px"><button class="btn" data-a="research">Buscar de nuevo</button></div>`;
+  const box = `<div class="row" style="margin-top:10px"><input type="text" id="recode" class="mono" placeholder="MX-0000000, ES-0000000, número o guía" style="flex:1 1 200px"><button class="btn" data-a="research">Buscar de nuevo</button></div>`;
   const d = t.enr_data || {};
   if (t.enr_status === 'buscando') return `<section class="panel">${h}<span class="chip info">Buscando</span></div><p class="small">El agente de búsqueda está consultando Bringgo / EasyShip. Esta página se actualiza sola.</p></section>`;
   if (t.enr_status === 'lista') return `<section class="panel">${h}<span class="chip ok">${esc(t.enr_source)}</span></div>

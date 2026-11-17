@@ -33,8 +33,10 @@ function finish(db, job, result, now = Date.now()) {
     } else {
       const code = dm.normCode(result.code);
       const data = { product: result.product || null, fields: result.fields, candidates: result.candidates || [], tried: result.tried };
-      db.prepare("UPDATE tickets SET enr_status='lista', enr_source=?, enr_data=?, enr_at=?, code=COALESCE(code, ?), plat=COALESCE(plat, ?) WHERE id=?")
-        .run(result.source, JSON.stringify(data), now, code, code ? code.slice(0, 2) : null, t.id);
+      // Un número tecleado sin MX/ES se completa con el prefijo de la plataforma donde se encontró.
+      db.prepare("UPDATE tickets SET enr_status='lista', enr_source=?, enr_data=?, enr_at=?, code=CASE WHEN code IS NULL OR (? IS NOT NULL AND code NOT LIKE '__-%') THEN COALESCE(?, code) ELSE code END, plat=COALESCE(plat, ?) WHERE id=?")
+        .run(result.source, JSON.stringify(data), now, code, code, code ? code.slice(0, 2) : null, t.id);
+      if (code && dm.isBare(t.code) && t.code !== code) dm.event(db, t.id, null, 'agente', `Agente de búsqueda: el número ${t.code} es ${code}`, now);
       dm.event(db, t.id, null, 'agente', `Agente de búsqueda: información obtenida de ${result.source}${data.candidates.length ? ` (${data.candidates.length} resultados; confirmar cuál)` : ''}`, now);
     }
     db.prepare("UPDATE enrichment_jobs SET status='done', error=NULL, updated_at=? WHERE id=?").run(now, job.id);
@@ -56,9 +58,15 @@ function failJob(db, job, err, now = Date.now()) {
 // Datos de prueba para correr sin Bringgo/EasyShip (pruebas automáticas y demo).
 const FAKE_DATA = {
   'MX-2900440': { source: 'Bringgo · Accept goods', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['Product Name', 'EVER ADVANCED Rolling Ball Storage Cart'], ['W.T No', 'MX-2900440'], ['ASIN', 'B0BPYBDTC6'], ['Quantity', '1']] },
+  'ES-4748635': { source: 'EasyShip · Orden', code: 'ES-4748635', product: null, fields: [['Orden EasyShip', '#4748635 · PRE_LABEL_CREATED'], ['Usuario', '#15589'], ['Paquetería', 'PAQUETEXPRESS > STANDARD']] },
   '191255213580': { source: 'Bringgo · Item Look Up · Outbound Tracking Number', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['W.H CODE', 'MX-2900440'], ['PRODUCT NAME', 'EVER ADVANCED Rolling Ball Storage Cart'], ['ASIN', 'B0BPYBDTC6'], ['SELLER ACCOUNT ORDER NO', '701-9461183-8702647'], ['OUTBOUND TRACKING', '191255213580 | Delivered']] },
 };
 async function fakeLookup(_page, { code, trk }) {
+  if (dm.isBare(code)) {
+    const hits = ['MX-' + code, 'ES-' + code].map(k => FAKE_DATA[k]).filter(Boolean);
+    if (hits.length === 1) return { ...hits[0], tried: ['Bringgo · Accept goods', 'EasyShip · Orden'] };
+    if (!hits.length) return { none: true, tried: ['Bringgo · Accept goods (MX-' + code + ')', 'EasyShip · Orden (ES-' + code + ')'] };
+  }
   const r = FAKE_DATA[code] || FAKE_DATA[trk];
   return r ? { ...r, tried: [r.source] } : { none: true, tried: [code ? (code.startsWith('MX') ? 'Bringgo · Accept goods' : 'EasyShip · Item lookup') : 'Bringgo · Item Look Up', 'EasyShip · Item lookup'] };
 }

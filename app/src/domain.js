@@ -32,6 +32,14 @@ const fail = (status, msg) => { throw new HttpError(status, msg); };
 
 const codeRe = /^(MX|ES)[\s-]?(\d{5,})$/i;
 const normCode = v => { const m = String(v || '').trim().match(codeRe); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+// Código tecleado: acepta "ES-4748635", "es 4748635" o solo "4748635" (sin MX/ES). Solo el número queda tal cual
+// (plataforma por identificar) y el agente lo busca como MX-… en Bringgo y como ES-… en EasyShip.
+const bareRe = /^#?(\d{6,9})$/;
+const parseCode = v => { const s = String(v || '').trim(); const m = s.match(bareRe); return normCode(s) || (m ? m[1] : null); };
+const isBare = c => /^\d+$/.test(String(c || ''));
+const platOf = c => (/^(MX|ES)-/.test(String(c || '')) ? c.slice(0, 2) : null);
+// Variantes que identifican el mismo paquete: 4748635 ↔ MX-4748635 / ES-4748635.
+const codeKeys = c => { if (!c) return []; if (isBare(c)) return [c, 'MX-' + c, 'ES-' + c]; return [c, c.slice(3)]; };
 const folio = id => 'INC-' + String(id).padStart(4, '0');
 const isOpenSql = `status NOT IN (${CLOSED.map(s => `'${s}'`).join(',')})`;
 
@@ -64,7 +72,7 @@ function createIncident(db, user, body, now = Date.now()) {
   const nolabel = !!body.nolabel;
   let code = null, trk = null;
   if (!nolabel) {
-    if (body.code) { code = normCode(body.code); if (!code) fail(400, 'El código debe ser MX-0000000 o ES-000000.'); }
+    if (body.code) { code = parseCode(body.code); if (!code) fail(400, 'El código debe ser MX-0000000, ES-0000000 o solo el número (ej. 4748635).'); }
     if (body.trk) { trk = String(body.trk).replace(/\s+/g, '').slice(0, 60); if (trk.length < 6) fail(400, 'La guía es muy corta.'); }
     if (!code && !trk) fail(400, 'Escanea una guía o teclea el código MX/ES.');
   } else if (type !== 'sinetiqueta' && type !== 'otro') fail(400, 'Un paquete sin etiqueta solo puede ser "Sin etiqueta" u "Otro".');
@@ -72,14 +80,14 @@ function createIncident(db, user, body, now = Date.now()) {
   const desc = String(body.description || '').trim().slice(0, 300);
   if (type === 'otro' && !other) fail(400, 'Especifica el motivo.');
   if (nolabel && !desc) fail(400, 'Describe el producto (no tiene código).');
-  const plat = code ? code.slice(0, 2) : null;
+  const plat = platOf(code);
   const damaged = type === 'danado';
 
   return tx(db, () => {
     // Anti-duplicado: mismo motivo y mismo código o guía con ticket abierto → se agrega al expediente.
     if (!nolabel) {
-      const ex = db.prepare(`SELECT * FROM tickets WHERE type=? AND ${isOpenSql} AND ((? IS NOT NULL AND code=?) OR (? IS NOT NULL AND trk=?)) ORDER BY id LIMIT 1`)
-        .get(type, code, code, trk, trk);
+      const ex = db.prepare(`SELECT * FROM tickets WHERE type=? AND ${isOpenSql} AND (code IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND trk=?)) ORDER BY id LIMIT 1`)
+        .get(type, JSON.stringify(codeKeys(code)), trk, trk);
       if (ex) {
         event(db, ex.id, user, 'evento', `Evento adicional registrado${other ? ': ' + other : ''}${trk && trk !== ex.trk ? ' · guía ' + trk : ''}`, now);
         return { id: ex.id, folio: folio(ex.id), appended: true, status: ex.status };
@@ -238,8 +246,8 @@ function research(db, user, id, value) {
   needAdmin(user);
   const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id); if (!t) fail(404, 'No existe ese ticket.');
   const v = String(value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.');
-  const c = normCode(v);
-  if (c) db.prepare('UPDATE tickets SET code=?, plat=? WHERE id=?').run(c, c.slice(0, 2), id);
+  const c = parseCode(v);
+  if (c) db.prepare('UPDATE tickets SET code=?, plat=? WHERE id=?').run(c, platOf(c), id);
   else db.prepare('UPDATE tickets SET trk=? WHERE id=?').run(v.replace(/\s+/g, '').slice(0, 60), id);
   event(db, id, user, 'agente', 'Pidió nueva búsqueda con ' + v);
   enqueue(db, db.prepare('SELECT * FROM tickets WHERE id=?').get(id));
@@ -264,6 +272,6 @@ function runDeadlines(db, now = Date.now()) {
   return changes;
 }
 
-module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, folio, isOpenSql,
+module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, parseCode, isBare, platOf, codeKeys, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
   confirmDup, resolve, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };

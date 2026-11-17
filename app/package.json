@@ -1,6 +1,6 @@
 {
   "name": "mx-wharehouse-incidencias",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "MVP de incidencias de registro (MX Wharehouse): tickets, panel de Victor y CS, agente de búsqueda en Bringgo/EasyShip",
   "engines": {

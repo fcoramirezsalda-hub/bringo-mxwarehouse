@@ -73,9 +73,9 @@ function createApp(db, opts = {}) {
   // ---------- Registro (operadores y admins) ----------
   app.post('/api/incidents', wrap(req => dm.createIncident(db, req.user, req.body, now())));
   app.get('/api/incidents/check', wrap(req => {
-    const code = dm.normCode(req.query.code), trk = req.query.trk ? String(req.query.trk).replace(/\s+/g, '') : null;
+    const code = dm.parseCode(req.query.code), trk = req.query.trk ? String(req.query.trk).replace(/\s+/g, '') : null;
     if (!code && !trk) return [];
-    return db.prepare(`SELECT id, type, owner_id FROM tickets WHERE ${dm.isOpenSql} AND ((? IS NOT NULL AND code=?) OR (? IS NOT NULL AND trk=?))`).all(code, code, trk, trk)
+    return db.prepare(`SELECT id, type, owner_id FROM tickets WHERE ${dm.isOpenSql} AND (code IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND trk=?))`).all(JSON.stringify(dm.codeKeys(code)), trk, trk)
       .map(t => ({ folio: dm.folio(t.id), type_label: dm.TYPES[t.type], has_owner: !!t.owner_id }));
   }));
   app.get('/api/my-reports', wrap(req => {

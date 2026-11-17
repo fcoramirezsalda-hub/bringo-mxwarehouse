@@ -126,6 +126,26 @@ test('agente (modo de prueba) llena la información de la orden o marca sin coin
   assert.strictEqual(st.status, 200);
 });
 
+test('código tecleado sin MX/ES: se acepta, se agrupa y el agente completa el prefijo', async () => {
+  const fat = await login('Fatima'), fra = await login('Francisco R.');
+  const a = await fat('POST', '/api/incidents', { type: 'producto', code: '4748635' });
+  assert.strictEqual(a.status, 200); assert.strictEqual(a.body.appended, false);
+  const chk = await fat('GET', '/api/incidents/check?code=ES-4748635');
+  assert.strictEqual(chk.body.length, 1, 'ES-4748635 encuentra el ticket del número solo');
+  const b = await fat('POST', '/api/incidents', { type: 'producto', code: 'ES-4748635' });
+  assert.strictEqual(b.body.appended, true); assert.strictEqual(b.body.id, a.body.id);
+  const n = await fat('POST', '/api/incidents', { type: 'inbound', code: '3999998' });
+  db.prepare('UPDATE enrichment_jobs SET next_at=0').run();
+  while (await worker.processOne(db, null, worker.fakeLookup)) { /* procesa toda la cola */ }
+  const ta = await fra('GET', '/api/tickets/' + a.body.id);
+  assert.strictEqual(ta.body.code, 'ES-4748635'); assert.strictEqual(ta.body.plat, 'ES');
+  const tn = await fra('GET', '/api/tickets/' + n.body.id);
+  assert.strictEqual(tn.body.enr_status, 'sin'); assert.strictEqual(tn.body.code, '3999998', 'sin coincidencias conserva el número');
+  assert.strictEqual(tn.body.plat, null);
+  const again = await fat('POST', '/api/incidents', { type: 'producto', code: '4748635' });
+  assert.strictEqual(again.body.id, a.body.id, 'después de completarse, el número solo sigue agrupando');
+});
+
 test('solo quien administra usuarios restablece PIN', async () => {
   const vic = await login('Victor'), fra = await login('Francisco R.');
   assert.strictEqual((await vic('POST', '/api/users/1/pin')).status, 403);
