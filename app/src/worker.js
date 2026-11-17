@@ -79,11 +79,23 @@ async function processOne(db, page, lookupFn) {
   return true;
 }
 
+// Navegador del agente: en Windows usa Microsoft Edge (ya viene instalado) para no depender
+// de descargar Chromium. AGENT_BROWSER=chromium fuerza el Chromium de Playwright.
+async function launchBrowser(opts) {
+  const { chromium } = require('playwright');
+  const pref = process.env.AGENT_BROWSER || (process.platform === 'win32' ? 'msedge' : 'chromium');
+  if (pref !== 'chromium') {
+    try { return await chromium.launchPersistentContext(PROFILE, { ...opts, channel: pref }); }
+    catch (e) { console.error(`No se pudo abrir ${pref} (${e.message.split('\n')[0]}); se intenta con Chromium.`); }
+  }
+  return chromium.launchPersistentContext(PROFILE, opts);
+}
+
 async function main() {
   const db = open();
   if (process.argv.includes('--login')) {
-    const { chromium } = require('playwright'); const c = require('./connectors');
-    const ctx = await chromium.launchPersistentContext(PROFILE, { headless: false, viewport: { width: 1400, height: 900 } });
+    const c = require('./connectors');
+    const ctx = await launchBrowser({ headless: false, viewport: { width: 1400, height: 900 } });
     (ctx.pages()[0] || await ctx.newPage()).goto(c.URLS.bringgoAccept);
     (await ctx.newPage()).goto(c.URLS.easyLookup);
     console.log('Inicia sesión en Bringgo y en EasyShip. Cuando veas las pantallas de búsqueda, cierra la ventana.');
@@ -93,8 +105,8 @@ async function main() {
   }
   let page = null, lookupFn = fakeLookup;
   if (!FAKE) {
-    const { chromium } = require('playwright'); const c = require('./connectors');
-    const ctx = await chromium.launchPersistentContext(PROFILE, { headless: process.env.HEADLESS !== 'false', viewport: { width: 1400, height: 900 } });
+    const c = require('./connectors');
+    const ctx = await launchBrowser({ headless: process.env.HEADLESS !== 'false', viewport: { width: 1400, height: 900 } });
     page = ctx.pages()[0] || await ctx.newPage(); lookupFn = c.lookup;
   }
   console.log(`Agente de búsqueda ${FAKE ? '(modo de prueba, sin navegador)' : ''} en marcha. Ctrl+C para detener.`);
