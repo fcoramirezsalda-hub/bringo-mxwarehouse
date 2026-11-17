@@ -173,3 +173,58 @@ test('chat: texto, foto o ambos en un envío; la foto queda como evidencia y no 
   const img = await fetch(base + '/api/evidence/' + a.body.evidence_id, { headers: { Cookie: '' } });
   assert.strictEqual(img.status, 401, 'la foto no se ve sin sesión');
 });
+
+test('bandeja: búsqueda por código (con o sin prefijo) o guía, en todos los estados', async () => {
+  const sam = await login('Samantha M.'), op = await login('Aracely');
+  const a = await op('POST', '/api/incidents', { type: 'producto', code: 'ES-4791234' });
+  const g = await op('POST', '/api/incidents', { type: 'inbound', trk: '1Z77AA10123499999' });
+  const ids = r => r.body.map(t => t.id);
+  assert.ok(ids(await sam('GET', '/api/tickets?q=4791234')).includes(a.body.id), 'número sin prefijo');
+  assert.ok(ids(await sam('GET', '/api/tickets?q=es-4791234')).includes(a.body.id), 'con prefijo en minúsculas');
+  assert.ok(ids(await sam('GET', '/api/tickets?q=10123499999')).includes(g.body.id), 'parte de la guía');
+  assert.ok(ids(await sam('GET', '/api/tickets?q=4201000099991Z77AA10123499999')).includes(g.body.id), 'código de barras largo que contiene la guía');
+  await sam('POST', `/api/tickets/${a.body.id}/quick-resolve`);
+  assert.ok(ids(await sam('GET', '/api/tickets?q=4791234&status=abiertos')).includes(a.body.id), 'la búsqueda ignora el filtro de estado');
+  assert.strictEqual((await sam('GET', '/api/tickets?q=47')).status, 400, 'mínimo 4 caracteres');
+  assert.deepStrictEqual((await sam('GET', '/api/tickets?q=%25%25%25%25')).body, [], 'comodines escapados');
+  assert.strictEqual((await op('GET', '/api/tickets?q=4791234')).status, 403, 'operador no ve la bandeja');
+});
+
+test('resolución rápida: un clic, toma si no tiene responsable, respeta al responsable y queda en Resueltos', async () => {
+  const sam = await login('Samantha M.'), pam = await login('Pamela V.'), vic = await login('Victor'), op = await login('Aracely');
+  const mk = async c => (await op('POST', '/api/incidents', { type: 'producto', code: c })).body.id;
+  const a = await mk('MX-3021001'), b = await mk('MX-3021002'), c = await mk('MX-3021003');
+  assert.strictEqual((await op('POST', `/api/tickets/${a}/quick-resolve`)).status, 403, 'operador no resuelve');
+  const r = await sam('POST', `/api/tickets/${a}/quick-resolve`);
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.status, 'Resuelto');
+  const d = (await sam('GET', '/api/tickets/' + a)).body;
+  assert.strictEqual(d.owner, 'Samantha M.'); assert.strictEqual(d.resolution, dm.QUICK_TEXT); assert.ok(d.resolved_at);
+  assert.ok(d.events.some(e => e.kind === 'resolucion' && e.who === 'Samantha M.'));
+  assert.ok(d.events.some(e => e.kind === 'asignacion' && e.text === 'Tomó el ticket'));
+  assert.ok((await sam('GET', '/api/tickets?status=resueltos')).body.some(t => t.id === a), 'aparece en Resueltos');
+  assert.strictEqual((await sam('POST', `/api/tickets/${a}/quick-resolve`)).status, 409, 'no se resuelve dos veces');
+  await sam('POST', `/api/tickets/${b}/take`);
+  assert.strictEqual((await pam('POST', `/api/tickets/${b}/quick-resolve`)).status, 403, 'CS no pisa el ticket de otra persona');
+  assert.strictEqual((await vic('POST', `/api/tickets/${b}/quick-resolve`)).status, 200, 'Victor (transferir) sí puede');
+  assert.strictEqual((await sam('GET', '/api/tickets/' + b)).body.owner, 'Samantha M.', 'el responsable no cambia');
+  await pam('POST', `/api/tickets/${c}/take`);
+  assert.strictEqual((await pam('POST', `/api/tickets/${c}/quick-resolve`)).status, 200, 'el responsable resuelve el suyo');
+});
+
+test('reabrir: quien resolvió o quien tiene permiso de restaurar; la resolución anterior queda en el historial', async () => {
+  const sam = await login('Samantha M.'), pam = await login('Pamela V.'), vic = await login('Victor'), op = await login('Aracely');
+  const id = (await op('POST', '/api/incidents', { type: 'producto', code: 'MX-3022001' })).body.id;
+  assert.strictEqual((await sam('POST', `/api/tickets/${id}/reopen`)).status, 409, 'abierto no se reabre');
+  await sam('POST', `/api/tickets/${id}/quick-resolve`);
+  assert.strictEqual((await sam('GET', '/api/tickets/' + id)).body.resolved_by_id > 0, true);
+  assert.strictEqual((await op('POST', `/api/tickets/${id}/reopen`)).status, 403, 'operador no');
+  assert.strictEqual((await pam('POST', `/api/tickets/${id}/reopen`)).status, 403, 'otra persona de CS no');
+  const r = await sam('POST', `/api/tickets/${id}/reopen`);
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.status, 'En gestión', 'vuelve con su responsable');
+  const d = (await sam('GET', '/api/tickets/' + id)).body;
+  assert.strictEqual(d.resolution, null); assert.strictEqual(d.owner, 'Samantha M.');
+  assert.ok(d.events.some(e => e.text.startsWith('Reabrió el ticket (resolución anterior: ' + dm.QUICK_TEXT)));
+  await sam('POST', `/api/tickets/${id}/quick-resolve`);
+  assert.strictEqual((await vic('POST', `/api/tickets/${id}/reopen`)).status, 200, 'Victor (restaurar) sí');
+  assert.ok((await sam('GET', '/api/tickets?status=abiertos')).body.some(t => t.id === id), 'vuelve a Abiertos');
+});

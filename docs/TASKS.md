@@ -21,6 +21,8 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 1.4 | Endpoint "tomar ticket" atómico (`UPDATE … WHERE owner_id IS NULL`) y pruebas de concurrencia | Codex | pendiente |
 | 1.5 | Interfaz de registro de incidencias en 3 pasos sobre la API (prioridad 1) | Claude Code | pendiente |
 | 1.6 | Bandeja y detalle administrativo | Claude Code | pendiente |
+| 1.8 | Bandeja: solo filtros Estado y Responsable, buscador por código MX/ES o guía, botón "Resuelto" en la fila (CS y Victor) | Claude Code | hecho 2026-11-17 |
+| 1.9 | "Reabrir" ticket resuelto (fila, aviso tras resolver y detalle) | Claude Code | hecho 2026-11-17 |
 | 1.7 | Subida de evidencias a almacenamiento privado, sin borrado | Codex | pendiente |
 
 ## Fase 1b · Agente de búsqueda de órdenes

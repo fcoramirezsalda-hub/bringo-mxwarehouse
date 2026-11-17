@@ -314,3 +314,10 @@ tr:last-child td{border-bottom:0}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .linkx{border:0;background:none;color:inherit;cursor:pointer;padding:0 0 0 4px;font:inherit}
 .msg .caption{margin-top:6px}
+/* Bandeja: buscador (lo más usado) y resolución rápida en la fila */
+.filtersbar .field.tsearch{flex:3 1 320px}
+.tsearch .row{gap:8px;flex-wrap:nowrap}
+.tsearch input{flex:1 1 auto;font-size:1.05rem;padding:9px 12px}
+td.qcell{text-align:right;width:1%;white-space:nowrap}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+td.qcell,th:last-child:has(.sr){position:sticky;right:0;background:var(--surface)}
