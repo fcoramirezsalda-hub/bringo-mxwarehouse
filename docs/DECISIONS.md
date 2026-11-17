@@ -27,6 +27,7 @@
 | 2026-11-17 | Los racks no tienen código de barras: el rack se asigna solo por paquetería y el operador puede cambiarlo en pantalla (sin confirmación por escaneo). | Propietario |
 | 2026-11-17 | El módulo de retornos se integra apagado por defecto (`RETURNS_MODE=off`), solo lectura y sin escribir en la hoja ni en el Site. Ver ADR-001. | Claude Code (propuesta, confirmar) |
 | 2026-11-17 | Chat interno sin "tipo" de mensaje. Las fotos se envían desde el chat (texto, foto o ambos) y se quitó la pestaña Evidencias. Las fotos siguen siendo evidencias del expediente y no se borran. | Propietario |
+| 2026-11-17 | Los códigos MX/ES se pueden teclear sin prefijo (`4748635` = `ES-4748635` o `MX-4748635`). Un número solo de 6 a 9 dígitos en el campo de código queda "por identificar" y el agente lo busca en Bringgo y EasyShip; el anti-duplicado trata `4748635`, `MX-4748635` y `ES-4748635` como el mismo paquete. Un número **escaneado** sigue siendo guía. | Propietario (pedido) · Claude Code (diseño) |
 
 ## Pendientes (requieren respuesta del propietario)
 
@@ -40,3 +41,4 @@
 8. **Regla de zonas** (≤ 5 kg y ≤ 60 cm → Zona 1): es un ejemplo. Hacen falta las tablas reales de tarifas.
 9. **Retornos:** ¿qué fuente real se usa? Recomendado: leer la hoja "Escaneo de Retornos" con una cuenta de servicio de solo lectura (ADR-001, opción B). La hoja no tiene rack ni estado; ¿se necesitan?
 10. **Motivos que se resuelven en piso** (Guía no reconocida, Extra Dept, No use label): con el registro de 3 clicks hoy abren ticket. ¿Deben registrarse directo como "Resuelto en piso" (solo historial)?
+11. **Número sin MX/ES repetido en las dos plataformas:** si `4748635` existe como MX y como ES, el agente muestra ambas y pide buscar de nuevo con el prefijo. ¿Pasa en la práctica? Si los rangos no se cruzan (hoy MX ≈ 2.9–3.0 M y ES ≈ 4.4–4.7 M), se podría decidir la plataforma al instante por el rango.

@@ -31,6 +31,7 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 1b.2 | Mapear campos de Accept goods, Item Look Up (outbound) y EasyShip Item lookup | ChatGPT + propietario | pendiente |
 | 1b.0 | Prueba de concepto en la PC de la bodega (`agent-poc/`) | Claude Code | en curso: falta conectar la PC |
 | 1b.3 | Cola `enrichment_jobs` + worker idempotente con reintentos y bitácora | Codex | bloqueado: 1b.1 |
+| 1b.5 | Teclear MX/ES sin prefijo (solo el número) y leer la orden ES en `prepare-v2/<número>` | Claude Code | hecho 2026-11-17 (falta probar con EasyShip real) |
 | 1b.4 | Panel "Información de la orden" en el ticket y columna "Orden" en la bandeja | Claude Code | hecho en prototipo |
 
 ## Fase 2 · Plazos y duplicados

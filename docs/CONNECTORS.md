@@ -12,7 +12,9 @@ Estado: **diseño + simulación en el prototipo**. No hay conexión real todaví
 |---|---|---|
 | Código MX | Bringgo · **Accept goods** (Search with BGMX) | https://app.bringgoship.com/en/dropshipping/add-package |
 | Guía escaneada (sin código) | Bringgo · **Item Look Up**, en este orden: Outbound Tracking Number → Inbound Tracking Number → Canceled Tracking Number | https://app.bringgoship.com/en/dropshipping/item-lookup |
-| Código ES o guía ES | EasyShip · **Item lookup** | https://warehouse.easyshipping.cloud/lookup/ |
+| Código ES | EasyShip · **Orden** (`prepare-v2/<número>`); si no abre, Item lookup | https://warehouse.easyshipping.cloud/prepare-v2/4748635/ |
+| Guía ES | EasyShip · **Item lookup** | https://warehouse.easyshipping.cloud/lookup/ |
+| Número sin MX/ES (ej. `4748635`, tecleado en el campo de código) | Bringgo Accept goods como `MX-4748635` **y** EasyShip Orden como `ES-4748635`. Si aparece en una sola, el ticket queda con ese código; si aparece en las dos, muestra ambas y pide confirmar | — |
 
 4. Escribe la información de la orden en el ticket: producto, ASIN, cantidad, fecha, seller order ID, cliente, destino, paquetería, guía mexicana y guía americana. También deja la fuente y la hora.
 5. Si no encuentra nada, marca "Sin coincidencias"; Victor o CS pueden agregar un MX/ES o una guía y volver a buscar.
@@ -56,7 +58,21 @@ Un buscador libre ("Where an item is and what happened to it"). Devuelve tarjeta
 | Buyer Tracking | Guía americana (inbound) | Sí |
 | (más abajo, cortado en la captura) | — | Falta ver |
 
-Pendiente: en EasyShip no se ve el código **ES-** en la tarjeta. ¿El "#4442683" es el número de orden que corresponde al ES, o el ES aparece en otro lado?
+~~Pendiente: ¿el "#4442683" es el número que corresponde al ES?~~ Resuelto 2026-11-17 (captura del propietario): `ES-4748635` es la orden
+`https://warehouse.easyshipping.cloud/prepare-v2/4748635/`, la pantalla que sale al buscar el ES.
+
+### EasyShip · Orden `prepare-v2` (captura de ejemplo, 2026-11-17)
+
+Solo se abre la página y se lee. **Nunca** se presiona "Send with standard", "Save Changes", "Change", "Add Note" ni "Report an Exception".
+
+| En la página | Se guarda como | Verificado con la página real |
+|---|---|---|
+| Estado (ej. `PRE_LABEL_CREATED`) | Orden EasyShip `#4748635 · estado` | No (solo captura) |
+| User Info - #15589 | Usuario | No |
+| Tarjeta seleccionada (ej. PAQUETEXPRESS > STANDARD) | Paquetería | No |
+| Box Price [0.60 lbs] | Peso | No |
+| Orden Amazon (###-#######-#######), ASIN y producto, si aparecen | Orden Amazon, ASIN, Producto | No |
+| Correo del usuario | No se guarda (se quitan correos) | — |
 
 ## Reglas
 
