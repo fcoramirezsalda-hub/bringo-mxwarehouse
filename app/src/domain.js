@@ -17,7 +17,7 @@ const PERMS = {
   resolve: 'Resolver',
   confirmdup: 'Confirmar duplicado',
   discard: 'Descartar incidencia',
-  restore: 'Restaurar descartada',
+  restore: 'Restaurar descartada / reabrir resueltos de otros',
   dispose: 'Confirmar Dispose realizado',
   users: 'Administrar usuarios',
 };
@@ -226,6 +226,27 @@ function quickResolve(db, user, id, now = Date.now()) {
     return { id, folio: folio(id), status: 'Resuelto' };
   });
 }
+// Quién resolvió: el último evento de resolución (no hay columna; se evita una migración).
+function resolverOf(db, id) {
+  const e = db.prepare("SELECT actor_id FROM ticket_events WHERE ticket_id=? AND kind='resolucion' ORDER BY created_at DESC, id DESC LIMIT 1").get(id);
+  return e ? e.actor_id : null;
+}
+// Reabrir un ticket resuelto (p. ej. "Resuelto" pulsado por error). Puede quien lo resolvió o quien tiene permiso de restaurar.
+// No borra nada: la resolución anterior queda en el historial.
+function reopen(db, user, id, now = Date.now()) {
+  needAdmin(user);
+  return tx(db, () => {
+    const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id);
+    if (!t) fail(404, 'No existe ese ticket.');
+    if (t.status !== 'Resuelto') fail(409, 'Solo se pueden reabrir tickets resueltos.');
+    if (resolverOf(db, id) !== user.id && !can(user, 'restore')) fail(403, 'Solo quien lo resolvió o alguien con permiso de restaurar puede reabrirlo.');
+    const st = t.waiting_dept ? 'Esperando respuesta' : t.owner_id ? 'En gestión' : 'Abierto';
+    const r = db.prepare("UPDATE tickets SET status=?, resolution=NULL, resolved_at=NULL, version=version+1 WHERE id=? AND version=? AND status='Resuelto'").run(st, id, t.version);
+    if (!r.changes) fail(409, 'El ticket cambió hace un instante; vuelve a intentarlo.');
+    event(db, id, user, 'resolucion', `Reabrió el ticket (resolución anterior: ${t.resolution || '—'})`, now);
+    return { id, folio: folio(id), status: st };
+  });
+}
 function disposeDone(db, user, id, evidenceId, now = Date.now()) {
   need(user, 'dispose');
   return tx(db, () => {
@@ -299,4 +320,4 @@ function runDeadlines(db, now = Date.now()) {
 
 module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, parseCode, isBare, platOf, codeKeys, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
-  confirmDup, resolve, quickResolve, QUICK_TEXT, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };
+  confirmDup, resolve, quickResolve, QUICK_TEXT, reopen, resolverOf, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };

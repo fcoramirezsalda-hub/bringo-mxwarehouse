@@ -67,6 +67,7 @@ function createApp(db, opts = {}) {
       dup_confirmed_by: t.dup_confirmed_by ? N[t.dup_confirmed_by] : null, dup_confirmed_at: t.dup_confirmed_at, dup_due_at: t.dup_due_at,
       resolution: t.resolution, resolved_at: t.resolved_at, discarded_by: t.discarded_by ? N[t.discarded_by] : null, discarded_at: t.discarded_at,
       discard_reason: t.discard_reason, dispose_scheduled_at: t.dispose_scheduled_at, dispose_done_at: t.dispose_done_at,
+      resolved_by_id: t.status === 'Resuelto' ? dm.resolverOf(db, t.id) : null,
       damage_outcome: t.damage_outcome, enr_status: t.enr_status, enr_source: t.enr_source, enr_data: t.enr_data ? JSON.parse(t.enr_data) : null, enr_at: t.enr_at, version: t.version };
   }
 
@@ -132,6 +133,7 @@ function createApp(db, opts = {}) {
   act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location));
   act('confirm-dup', (req, id) => dm.confirmDup(db, req.user, id, now()));
   act('resolve', (req, id) => dm.resolve(db, req.user, id, req.body.resolution, now()));
+  app.post('/api/tickets/:id/reopen', wrap(req => dm.reopen(db, req.user, Number(req.params.id), now())));
   app.post('/api/tickets/:id/quick-resolve', wrap(req => dm.quickResolve(db, req.user, Number(req.params.id), now())));
   act('dispose-done', (req, id) => dm.disposeDone(db, req.user, id, Number(req.body.evidence_id), now()));
   act('discard', (req, id) => dm.discard(db, req.user, id, req.body.reason, req.body.confirm === true, now()));

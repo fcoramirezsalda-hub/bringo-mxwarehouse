@@ -84,7 +84,7 @@ function after() {
   if (S.view === 'escaneo') { const el = $('#rscan'); if (el && !S.rs.keepFocus) el.focus(); S.rs.keepFocus = false; }
   if (S.view === 'registro') { const R = S.R; const el = R && R.focusCode ? $('#code') : (!R || R.step === 1) ? $('#scan') : (R.type === 'otro' ? $('#f-otro') : R.nolabel ? $('#f-desc') : null); if (el) el.focus(); if (R) R.focusCode = false; }
 }
-function route() { const h = location.hash.slice(1); const ok = navFor().map(x => x[0]); S.view = VIEWS[h] && ok.includes(h) ? h : (isAdmin() ? 'tickets' : 'registro'); S.sel = null; S.ui = {}; render(); scrollTo(0, 0); agentStatus(); }
+function route() { if (!S.me) return; const h = location.hash.slice(1); const ok = navFor().map(x => x[0]); S.view = VIEWS[h] && ok.includes(h) ? h : (isAdmin() ? 'tickets' : 'registro'); S.sel = null; S.ui = {}; render(); scrollTo(0, 0); agentStatus(); }
 addEventListener('hashchange', route);
 
 /* ---------- Registro ---------- */
@@ -156,13 +156,14 @@ async function vMisReportes() {
 /* ---------- Bandeja ---------- */
 // Resolución rápida: solo CS y Victor (permiso "resolver"); el servidor vuelve a validar todo.
 const canQuick = t => can('resolve') && t.open && t.status !== 'Dispose programado' && (!t.owner_id || t.owner_id === S.me.id || can('transfer'));
+const canReopen = t => t.status === 'Resuelto' && (can('restore') || (t.resolved_by_id && t.resolved_by_id === S.me.id));
 function ticketTable(list, compact, quick) {
   return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th>${quick ? '<th><span class="sr">Acción</span></th>' : ''}</tr></thead><tbody>
   ${list.length ? list.map(t => { const d = dueInfo(t); return `<tr class="click ${d.k === 'late' ? 'late' : d.k === 'soon' ? 'soon' : ''}" data-a="open" data-v="${t.id}" tabindex="0">
     <td class="mono"><b>${t.folio}</b></td><td><span class="mono">${esc(idl(t))}</span> ${t.plat ? `<span class="chip ${t.plat === 'MX' ? 'mx' : 'es'}">${t.plat}</span>` : ''}</td><td>${esc(t.type_label)}${t.other_text ? `<div class="muted small">${esc(t.other_text)}</div>` : ''}</td>
     ${compact ? '' : `<td>${enrChip(t)}</td><td>${esc(t.reporter)}<div class="muted small">${fdt(t.created_at)}</div></td>`}
     <td>${t.owner ? esc(t.owner) : t.open ? '<span class="chip warn">Sin asignar</span>' : '<span class="muted">—</span>'}</td>${compact ? '' : `<td>${t.waiting_dept && t.open ? esc(t.waiting_dept) : '<span class="muted">—</span>'}</td>`}
-    <td>${d.html}</td><td>${stChip(t.status)}</td>${quick ? `<td class="qcell">${canQuick(t) ? `<button class="btn sm done" data-a="qres" data-v="${t.id}" title="Marcar ${t.folio} como resuelto">Resuelto</button>` : ''}</td>` : ''}</tr>`; }).join('') : '<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
+    <td>${d.html}</td><td>${stChip(t.status)}</td>${quick ? `<td class="qcell">${canQuick(t) ? `<button class="btn sm done" data-a="qres" data-v="${t.id}" title="Marcar ${t.folio} como resuelto">Resuelto</button>` : canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" title="Reabrir ${t.folio}">Reabrir</button>` : ''}</td>` : ''}</tr>`; }).join('') : '<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
   </tbody></table></div>`;
 }
 async function vTickets() {
@@ -235,7 +236,7 @@ async function vDetail() {
         ${t.description ? `<div><div class="lbl">Descripción</div><div class="v">${esc(t.description)}</div></div>` : ''}
         ${t.type === 'danado' ? `<div><div class="lbl">Desenlace del envío</div><div class="v">${esc(t.damage_outcome)}</div></div>` : ''}
       </div>
-      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b>${esc(t.resolution)}</div></div>` : ''}
+      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b>${esc(t.resolution)}</div>${canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" style="margin-left:auto">Reabrir</button>` : ''}</div>` : ''}
       ${t.status === 'Descartado' ? `<div class="banner bad" style="margin-top:14px"><span class="ic">!</span><div><b>Descartado por ${esc(t.discarded_by)} · ${fdt(t.discarded_at)}</b>${esc(t.discard_reason)}</div></div>` : ''}
     </section>
     ${orderPanel(t)}
@@ -390,12 +391,17 @@ document.addEventListener('click', async e => {
     case 'type': R.type = v; R.f = {}; await render(); if (v !== 'otro' && !R.nolabel) $('#regbtn')?.focus(); break;
     case 'register': register(); break;
     case 'open': openTicket(v); break;
+    case 'reopen':
+      el.disabled = true;
+      try { const r = await api('POST', `/api/tickets/${v}/reopen`); toast(`${esc(r.folio)} reabierto · ${esc(r.status)}`); }
+      catch (err) { toast(esc(err.message)); }
+      await render(); break;
     case 'tq-go': tsearch($('#tq').value); break;
     case 'tq-clear': S.q = ''; render(); break;
     case 'qres': {
       // Sin ventana de confirmación (pedido del propietario): un clic resuelve y queda en "Resueltos" y en el historial.
       el.disabled = true; el.textContent = '…';
-      try { const r = await api('POST', `/api/tickets/${v}/quick-resolve`); toast(`${esc(r.folio)} resuelto · queda en Resueltos`); }
+      try { const r = await api('POST', `/api/tickets/${v}/quick-resolve`); toast(`${esc(r.folio)} resuelto · queda en Resueltos <button class="btn link" style="color:inherit;margin-left:8px" data-a="reopen" data-v="${r.id}">Reabrir</button>`); }
       catch (err) { toast(esc(err.message)); }
       await render(); break; }
     case 'back': S.sel = null; S.ui = {}; render(); break;

@@ -1,5 +1,19 @@
 # Handoff
 
+## 2026-11-17 (11) · Claude Code · reabrir tickets resueltos (v0.6.1)
+
+- El propietario eligió "Reabrir" (en lugar de "Deshacer") para corregir un "Resuelto" pulsado por error.
+- `POST /api/tickets/:id/reopen` (`domain.reopen`): solo tickets en estado Resuelto (no Dispose realizado, Enviado dañado ni Descartado).
+  Puede quien lo resolvió (último evento `resolucion`, sin columna nueva) o quien tiene el permiso `restore` (Victor, Francisco R.).
+  Vuelve a En gestión / Esperando respuesta / Abierto según responsable y espera; borra `resolution` y `resolved_at` del ticket, pero
+  la resolución anterior queda en el evento "Reabrió el ticket (resolución anterior: …)". Condicionado a `version`.
+- Botón "Reabrir" en la fila de la bandeja (donde estaba "Resuelto"), en el aviso que sale al resolver y en el banner de resolución del detalle.
+- El permiso `restore` ahora dice "Restaurar descartada / reabrir resueltos de otros". Sin migración.
+- Arreglo menor: `route()` ya no falla si cambia el `#` de la dirección en la pantalla de inicio de sesión.
+- Pruebas: `npm test` 30/30 (nueva: reabrir con permisos e historial). Navegador: resolver → Reabrir desde el aviso → En gestión;
+  Reabrir en fila y detalle; Pamela no ve Reabrir en un ticket que resolvió Samantha; sin errores de consola.
+- Demo regenerada; falta publicarla.
+
 ## 2026-11-17 (10) · Claude Code · bandeja: buscador, filtros reducidos y resolución rápida (v0.6.0)
 
 - Pedido del propietario. Sin migración ni dependencias nuevas.

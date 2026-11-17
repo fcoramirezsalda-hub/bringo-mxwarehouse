@@ -210,3 +210,21 @@ test('resolución rápida: un clic, toma si no tiene responsable, respeta al res
   await pam('POST', `/api/tickets/${c}/take`);
   assert.strictEqual((await pam('POST', `/api/tickets/${c}/quick-resolve`)).status, 200, 'el responsable resuelve el suyo');
 });
+
+test('reabrir: quien resolvió o quien tiene permiso de restaurar; la resolución anterior queda en el historial', async () => {
+  const sam = await login('Samantha M.'), pam = await login('Pamela V.'), vic = await login('Victor'), op = await login('Aracely');
+  const id = (await op('POST', '/api/incidents', { type: 'producto', code: 'MX-3022001' })).body.id;
+  assert.strictEqual((await sam('POST', `/api/tickets/${id}/reopen`)).status, 409, 'abierto no se reabre');
+  await sam('POST', `/api/tickets/${id}/quick-resolve`);
+  assert.strictEqual((await sam('GET', '/api/tickets/' + id)).body.resolved_by_id > 0, true);
+  assert.strictEqual((await op('POST', `/api/tickets/${id}/reopen`)).status, 403, 'operador no');
+  assert.strictEqual((await pam('POST', `/api/tickets/${id}/reopen`)).status, 403, 'otra persona de CS no');
+  const r = await sam('POST', `/api/tickets/${id}/reopen`);
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.status, 'En gestión', 'vuelve con su responsable');
+  const d = (await sam('GET', '/api/tickets/' + id)).body;
+  assert.strictEqual(d.resolution, null); assert.strictEqual(d.owner, 'Samantha M.');
+  assert.ok(d.events.some(e => e.text.startsWith('Reabrió el ticket (resolución anterior: ' + dm.QUICK_TEXT)));
+  await sam('POST', `/api/tickets/${id}/quick-resolve`);
+  assert.strictEqual((await vic('POST', `/api/tickets/${id}/reopen`)).status, 200, 'Victor (restaurar) sí');
+  assert.ok((await sam('GET', '/api/tickets?status=abiertos')).body.some(t => t.id === id), 'vuelve a Abiertos');
+});
