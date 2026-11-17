@@ -33,6 +33,11 @@ El agente usa Microsoft Edge, que ya viene con Windows 10/11. Solo si la PC no t
 `npm run setup` crea la base de datos y muestra **un PIN de 4 dígitos para cada persona**. Anótalos y entrégalos en persona;
 no se vuelven a mostrar. Francisco R. puede restablecer cualquier PIN desde "Equipo y permisos".
 
+**Agregar o quitar personas:** en "Equipo y permisos" (solo quien tiene el permiso "Administrar usuarios", hoy Francisco R.):
+escribe el nombre, elige el perfil (Operación, Equipo de retornos, Customer Service o Procesamiento) y pulsa "Agregar"; se muestra su PIN una sola vez.
+"Dar de baja" impide que entre y deja sin responsable sus tickets abiertos; su historial se conserva y se puede "Reactivar".
+Volver a correr `npm run setup` en una base existente solo agrega a las personas del equipo base que falten (por ejemplo, Isaac).
+
 3. Inicia sesión en Bringgo y EasyShip para el agente (se abre un navegador; inicias sesión tú y lo cierras):
 
 ```

@@ -1,5 +1,21 @@
 # Handoff
 
+## 2026-11-17 (6) · Claude Code · alta/baja de usuarios y equipo de retornos (v0.4.0)
+
+- "Equipo y permisos" ahora tiene **Agregar persona** (nombre + perfil) y botones **Dar de baja / Reactivar**. Solo con el permiso `users` (Francisco R.).
+  - Perfiles fijos en `app/src/domain.js` (`PROFILES`): Operación, Equipo de retornos (ambos `op`, sin permisos), Customer Service (tomar, resolver, confirmar duplicado), Procesamiento (todo menos usuarios).
+  - API: `GET /api/user-profiles`, `POST /api/users {name, profile}` (devuelve el PIN una vez), `POST /api/users/:id/active {active}`.
+  - Nombres únicos sin importar acentos ni mayúsculas ("Josue" = "Josué"). Baja lógica: cierra sus sesiones y libera sus tickets abiertos con evento en el historial. No puedes darte de baja a ti mismo.
+- Equipo de retornos en el equipo base: **Isaac, Adrian, Josué** (área "Retornos", solo registran incidencias). Antes estaban Josue y Adrian como "Retornos y apoyo"; faltaba Isaac.
+- `npm run setup` en una base existente ya no se detiene: agrega solo a las personas del equipo base que falten (en la PC de la bodega agregará a Isaac y mostrará su PIN). No modifica a nadie existente ni reactiva bajas.
+  En la PC de la bodega, Josue y Adrian siguen con su área anterior ("Operación"); los permisos son los mismos. Isaac también puede agregarse desde la pantalla.
+- Demo (`demo/mock-api.js`) con las mismas reglas; clave de datos `mxw-demo-v4` (reinicia los datos de la demo). Regenerada con `node demo/build.js`.
+
+**Pruebas:** `npm test` 13/13 (3 nuevas: retornos registra pero no ve tickets; alta/baja/reactivación con permisos y liberación de tickets; setup agrega solo a quien falta).
+En navegador (servidor real): alta de "Luis" con perfil retornos muestra PIN, baja con confirmación, fila "Dado de baja" con "Reactivar", 400 px sin scroll horizontal, sin errores de la página.
+
+**Falta:** volver a publicar la demo en el link del panel; correr `npm run setup` (o agregar a Isaac desde la pantalla) en la PC de la bodega; decidir la bitácora de altas/bajas (DECISIONS pendiente 11).
+
 ## 2026-11-17 (5) · Claude Code · instalador arranca el sistema y lo comprueba
 
 - En la PC de la bodega el instalador terminó, pero http://localhost:8080 no respondía y no se vio Edge en el paso 6.

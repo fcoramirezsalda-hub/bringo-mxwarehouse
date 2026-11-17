@@ -4,7 +4,7 @@
    Los datos viven solo en este navegador (localStorage). PIN de prueba para todos: 1234. */
 (function () {
   'use strict';
-  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v3', PIN = '1234';
+  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v4', PIN = '1234';
   const TYPES = { inbound: 'Guía no reconocida', producto: 'Sin producto o diferente', danado: 'Dañado o con escurrimiento', extradept: 'Extra Dept', sinetiqueta: 'Sin etiqueta', nouse: 'No use label', duplicado: 'Duplicado', otro: 'Otro' };
   const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
   const DEPTS = ['Bringgo', 'EasyShip', 'Equipo turco', 'Vendedor Amazon', 'Murat (Laredo)', 'Customer Service', 'Procesamiento'];
@@ -15,7 +15,7 @@
   const TEAM = [
     ['Fatima', 'op', 'Operación', 'Procesadora de paquetes', []], ['Mauricio', 'op', 'Operación', 'Procesador de paquetes', []],
     ['Aracely', 'op', 'Operación', 'Procesadora de paquetes', []], ['Michelle', 'op', 'Operación', 'Procesadora de paquetes', []],
-    ['Josue', 'op', 'Operación', 'Retornos y apoyo', []], ['Adrian', 'op', 'Operación', 'Retornos y apoyo', []],
+    ['Isaac', 'op', 'Retornos', 'Equipo de retornos', []], ['Adrian', 'op', 'Retornos', 'Equipo de retornos', []], ['Josué', 'op', 'Retornos', 'Equipo de retornos', []],
     ['Victor', 'admin', 'Procesamiento', 'Resuelve incidencias', ALL.filter(p => p !== 'users')],
     ['Francisco R.', 'admin', 'Customer Service', 'Customer Service · administrador del sistema', ALL],
     ['Samantha M.', 'admin', 'Customer Service', 'Customer Service', CS], ['Pamela V.', 'admin', 'Customer Service', 'Customer Service', CS],
@@ -28,6 +28,12 @@
     'ES-118412': { source: 'EasyShip · Item lookup', code: 'ES-118412', product: 'Olaplex No. 3 Hair Perfector 100 ml', fields: [['Orden EasyShip', '#4442683 · Delivered'], ['Producto', 'Olaplex No. 3 Hair Perfector 100 ml'], ['ASIN', 'B00SNM5US4'], ['Tracking ID', '8055420177'], ['Seller Order', '701-6636277-7159417'], ['Buyer Order', '114-7881374-5366648']] },
   };
 
+  const PROFILES = {
+    operacion: { label: 'Operación (registra incidencias)', role: 'op', dept: 'Operación', title: 'Procesador(a) de paquetes', perms: [] },
+    retornos: { label: 'Equipo de retornos (registra incidencias)', role: 'op', dept: 'Retornos', title: 'Equipo de retornos', perms: [] },
+    cs: { label: 'Customer Service (panel: tomar, resolver, confirmar duplicado)', role: 'admin', dept: 'Customer Service', title: 'Customer Service', perms: CS },
+    procesamiento: { label: 'Procesamiento (panel: todo menos administrar usuarios)', role: 'admin', dept: 'Procesamiento', title: 'Resuelve incidencias', perms: ALL.filter(p => p !== 'users') } };
+  const nn = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   const now = () => Date.now();
   const folio = id => 'INC-' + String(id).padStart(4, '0');
   const normCode = v => { const m = String(v || '').trim().match(/^(MX|ES)[\s-]?(\d{5,})$/i); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
@@ -158,9 +164,9 @@
   function route(method, url, body) {
     const u0 = new URL(url, location.href), p = u0.pathname, q = Object.fromEntries(u0.searchParams);
     if (p === '/api/version') return { version: (window.MXW_VERSION || '') + ' · demo' };
-    if (p === '/api/login-users') return DB.users.map(u => ({ name: u.name, role: u.role }));
+    if (p === '/api/login-users') return DB.users.filter(u => u.active).map(u => ({ name: u.name, role: u.role }));
     if (p === '/api/login' && method === 'POST') {
-      const u = DB.users.find(x => x.name === body.name); if (!u || String(body.pin) !== PIN) fail(401, 'Usuario o PIN incorrecto. En la demo el PIN es 1234.');
+      const u = DB.users.find(x => x.name === body.name && x.active); if (!u || String(body.pin) !== PIN) fail(401, 'Usuario o PIN incorrecto. En la demo el PIN es 1234.');
       try { sessionStorage.setItem(KEY + '-uid', u.id); } catch {} window.__mxwUid = u.id; return me(u);
     }
     if (p === '/api/logout') { try { sessionStorage.removeItem(KEY + '-uid'); } catch {} window.__mxwUid = null; return { ok: true }; }
@@ -183,7 +189,20 @@
     if (p === '/api/duplicates') return DB.tickets.filter(t => t.type === 'duplicado' && t.status !== 'Descartado').sort(byDue).map(row);
     if (p === '/api/damaged') return DB.tickets.filter(t => t.type === 'danado' && t.status === 'Enviado dañado').sort((a, b) => b.id - a.id).map(row);
     if (p === '/api/discarded') return DB.tickets.filter(t => t.status === 'Descartado').sort((a, b) => b.discarded_at - a.discarded_at).map(row);
-    let m = p.match(/^\/api\/users\/(\d+)\/pin$/);
+    if (p === '/api/user-profiles') { need(u, 'users'); return Object.entries(PROFILES).map(([id, x]) => ({ id, label: x.label })); }
+    if (p === '/api/users' && method === 'POST') {
+      need(u, 'users'); const name = String(body.name || '').replace(/\s+/g, ' ').trim(), pr = PROFILES[body.profile];
+      if (name.length < 2 || name.length > 40) fail(400, 'Escribe el nombre (de 2 a 40 caracteres).'); if (!pr) fail(400, 'Elige un perfil válido.');
+      const ex = DB.users.find(x => nn(x.name) === nn(name)); if (ex) fail(409, ex.active ? `Ya existe ${ex.name}.` : `${ex.name} ya existe pero está dado de baja. Usa "Reactivar".`);
+      const id = Math.max(...DB.users.map(x => x.id)) + 1; DB.users.push({ id, name, role: pr.role, dept: pr.dept, title: pr.title, perms: pr.perms, active: 1 }); save();
+      return { id, name, pin: PIN + ' (en la demo todos usan este PIN)' };
+    }
+    let m = p.match(/^\/api\/users\/(\d+)\/active$/);
+    if (m) { need(u, 'users'); const t = user(Number(m[1])); if (!t) fail(404, 'No existe ese usuario.'); const on = !!body.active;
+      if (!on && t.id === u.id) fail(400, 'No puedes darte de baja a ti mismo.'); t.active = on ? 1 : 0; let released = 0;
+      if (!on) for (const k of DB.tickets.filter(x => x.owner_id === t.id && isOpen(x))) { k.owner_id = null; if (k.status === 'En gestión') k.status = 'Abierto'; event(k, u, 'asignacion', `Ticket liberado: ${t.name} fue dado de baja`); released++; }
+      save(); return { name: t.name, active: on, released }; }
+    m = p.match(/^\/api\/users\/(\d+)\/pin$/);
     if (m) { need(u, 'users'); return { name: user(Number(m[1])).name, pin: PIN + ' (en la demo no cambia)' }; }
     if (p === '/api/tickets') {
       const n = now();

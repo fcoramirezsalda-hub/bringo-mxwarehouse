@@ -54,6 +54,7 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 
 | # | Tarea | Responsable | Fecha |
 |---|---|---|---|
+| U.1 | Alta, baja y reactivación de usuarios desde "Equipo y permisos"; equipo de retornos (Isaac, Adrian, Josué) | Claude Code | 2026-11-17 |
 | M.1 | MVP de incidencias en `app/` (servidor, BD, interfaz, agente, pruebas) | Claude Code | 2026-11-15 |
 
 ### Anteriores

@@ -287,13 +287,27 @@ async function vDescartes() {
   </tbody></table></div></section>`;
 }
 async function vEquipo() {
-  S.users = await api('GET', '/api/users'); const adm = S.users.filter(u => u.role === 'admin'), P = S.me.perms_catalog;
+  S.users = await api('GET', '/api/users'); const adm = S.users.filter(u => u.role === 'admin' && u.active), P = S.me.perms_catalog;
+  const admin = can('users');
+  if (admin && !S.profiles) S.profiles = await api('GET', '/api/user-profiles');
+  const act = S.users.filter(u => u.active), inact = S.users.filter(u => !u.active);
+  const rowU = u => `<tr${u.active ? '' : ' class="muted"'}><td><b>${esc(u.name)}</b><div class="muted small">${esc(u.title)}</div></td><td>${u.role === 'admin' ? 'Panel administrativo' : 'Operador'}</td><td>${esc(u.dept)}</td>
+    <td>${u.active ? '<span class="chip ok">Activo</span>' : '<span class="chip neutral">Dado de baja</span>'}</td>
+    <td style="text-align:right;white-space:nowrap">${admin ? (u.active
+      ? `<button class="btn sm" data-a="pin" data-v="${u.id}">Restablecer PIN</button> ${u.id === S.me.id ? '' : `<button class="btn sm" data-a="ubaja" data-v="${u.id}">Dar de baja</button>`}`
+      : `<button class="btn sm" data-a="ualta" data-v="${u.id}">Reactivar</button>`) : ''}</td></tr>`;
   return `<div class="panel-h"><h1>Equipo y permisos</h1></div>
-  ${S.ui.newpin ? `<div class="banner ok"><span class="ic">✓</span><div><b>Nuevo PIN de ${esc(S.ui.newpin.name)}: <span class="mono">${esc(S.ui.newpin.pin)}</span></b>Entrégalo en persona. No se vuelve a mostrar.</div></div>` : ''}
-  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Persona</th><th>Rol</th><th>Área</th><th></th></tr></thead><tbody>
-  ${S.users.map(u => `<tr><td><b>${esc(u.name)}</b><div class="muted small">${esc(u.title)}</div></td><td>${u.role === 'admin' ? 'Panel administrativo' : 'Operador'}</td><td>${esc(u.dept)}</td><td style="text-align:right">${can('users') ? `<button class="btn sm" data-a="pin" data-v="${u.id}">Restablecer PIN</button>` : ''}</td></tr>`).join('')}
+  ${S.ui.newpin ? `<div class="banner ok"><span class="ic">✓</span><div><b>${S.ui.newpin.created ? 'Usuario creado. ' : 'Nuevo '}PIN de ${esc(S.ui.newpin.name)}: <span class="mono">${esc(S.ui.newpin.pin)}</span></b>Entrégalo en persona. No se vuelve a mostrar.</div></div>` : ''}
+  ${admin ? `<section class="panel"><div class="panel-h"><h2>Agregar persona</h2><span class="sp"></span><span class="muted">entra con su nombre y un PIN de 4 dígitos</span></div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field" style="flex:1 1 180px"><label class="lbl" for="nuname">Nombre</label><input id="nuname" maxlength="40" autocomplete="off" placeholder="Ej. Isaac"></div>
+      <div class="field" style="flex:2 1 260px"><label class="lbl" for="nuprof">Perfil</label><select id="nuprof">${S.profiles.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('')}</select></div>
+      <button class="btn primary" data-a="ualta-new">Agregar</button>
+    </div></section>` : ''}
+  <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Persona</th><th>Rol</th><th>Área</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${act.map(rowU).join('')}${inact.map(rowU).join('')}
   </tbody></table></div></section>
-  <section class="panel"><div class="panel-h"><h2>Matriz de permisos</h2><span class="sp"></span><span class="muted">validados en el servidor</span></div><div class="tbl-wrap"><table><thead><tr><th>Acción</th><th>Operadores</th>${adm.map(u => `<th>${esc(u.name)}</th>`).join('')}</tr></thead><tbody>
+  <section class="panel"><div class="panel-h"><h2>Matriz de permisos</h2><span class="sp"></span><span class="muted">validados en el servidor</span></div><div class="tbl-wrap"><table><thead><tr><th>Acción</th><th>Operadores y retornos</th>${adm.map(u => `<th>${esc(u.name)}</th>`).join('')}</tr></thead><tbody>
   <tr><td>Registrar incidencia</td><td class="yes">Sí</td>${adm.map(() => '<td class="yes">Sí</td>').join('')}</tr>
   <tr><td>Ver bandeja, chat, historial y evidencias</td><td class="no">No</td>${adm.map(() => '<td class="yes">Sí</td>').join('')}</tr>
   ${Object.entries(P).map(([k, l]) => `<tr><td>${esc(l)}</td><td class="no">No</td>${adm.map(u => u.perms.includes(k) ? '<td class="yes">Sí</td>' : '<td class="no">No</td>').join('')}</tr>`).join('')}
@@ -321,6 +335,7 @@ function openTicket(id) { S.sel = Number(id); S.tab = 'chat'; S.ui = {}; if (S.v
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
+  if (e.target.id === 'nuname') { e.preventDefault(); $('[data-a="ualta-new"]')?.click(); return; }
   if (e.target.id === 'scan') identify(e.target.value, 'scan');
   else if (e.target.id === 'code') identify(e.target.value, 'code');
   else if (e.target.dataset && e.target.dataset.f && !$('#regbtn')?.disabled) { e.preventDefault(); register(); }
@@ -384,6 +399,13 @@ document.addEventListener('click', async e => {
       } catch (err) { toast(esc(err.message)); }
       break; }
     case 'pin': try { S.ui.newpin = await api('POST', `/api/users/${v}/pin`); render(); } catch (err) { toast(esc(err.message)); } break;
+    case 'ualta-new': try {
+        const r = await api('POST', '/api/users', { name: $('#nuname').value, profile: $('#nuprof').value });
+        S.ui.newpin = { ...r, created: true }; S.users = []; render();
+      } catch (err) { toast(esc(err.message)); } break;
+    case 'ubaja': { const u = S.users.find(x => x.id === Number(v)); if (!u || !confirm(`¿Dar de baja a ${u.name}? Ya no podrá entrar. Sus tickets abiertos quedan sin responsable. Su historial se conserva y se puede reactivar.`)) break;
+      try { const r = await api('POST', `/api/users/${v}/active`, { active: false }); toast(`${esc(r.name)} dado de baja${r.released ? ` · ${r.released} ticket(s) liberados` : ''}`); S.ui = {}; S.users = []; render(); } catch (err) { toast(esc(err.message)); } break; }
+    case 'ualta': try { const r = await api('POST', `/api/users/${v}/active`, { active: true }); toast(`${esc(r.name)} reactivado`); S.ui = {}; S.users = []; render(); } catch (err) { toast(esc(err.message)); } break;
   }
 });
 

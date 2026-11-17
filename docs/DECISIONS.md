@@ -24,6 +24,8 @@
 | 2026-11-15 | Mientras no haya nube autorizada, los tickets y su historial se copian cada minuto a una hoja de Google Sheets en el Drive del propietario (Apps Script con token). La base local sigue siendo la principal. | Propietario |
 | 2026-11-15 | Dañado o con escurrimiento: se re-empaca y se envía. No abre ticket para CS; queda en un registro de "Enviados dañados" con desenlace (pendiente, regresó, dispose de paquetería, entregado). | Propietario |
 | 2026-11-17 | Chat interno sin "tipo" de mensaje. Las fotos se envían desde el chat (texto, foto o ambos) y se quitó la pestaña Evidencias. Las fotos siguen siendo evidencias del expediente y no se borran. | Propietario |
+| 2026-11-17 | Equipo de retornos: Isaac, Adrian y Josué. Solo registran incidencias (perfil operador, área "Retornos"); sin permisos de CS ni de Victor. | Propietario |
+| 2026-11-17 | Usuarios se agregan y se dan de baja desde "Equipo y permisos" con perfiles fijos. La baja es lógica (no se borra): no puede entrar, sus tickets abiertos quedan sin responsable y se puede reactivar. Nadie se da de baja a sí mismo. | Propietario (pedido) · Claude Code (diseño) |
 
 ## Pendientes (requieren respuesta del propietario)
 
@@ -37,3 +39,4 @@
 8. **Regla de zonas** (≤ 5 kg y ≤ 60 cm → Zona 1): es un ejemplo. Hacen falta las tablas reales de tarifas.
 9. **Retornos:** acceso de solo lectura a la hoja de Google para mapear columnas y estados.
 10. **Motivos que se resuelven en piso** (Guía no reconocida, Extra Dept, No use label): con el registro de 3 clicks hoy abren ticket. ¿Deben registrarse directo como "Resuelto en piso" (solo historial)?
+11. **Bitácora de altas y bajas de usuarios:** hoy no queda registro de quién agregó o dio de baja a alguien (requiere una tabla nueva, es decir, una migración). ¿Se aprueba?

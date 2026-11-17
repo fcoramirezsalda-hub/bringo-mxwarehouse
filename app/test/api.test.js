@@ -153,3 +153,56 @@ test('chat: texto, foto o ambos en un envío; la foto queda como evidencia y no 
   const img = await fetch(base + '/api/evidence/' + a.body.evidence_id, { headers: { Cookie: '' } });
   assert.strictEqual(img.status, 401, 'la foto no se ve sin sesión');
 });
+
+test('equipo de retornos registra incidencias pero no ve tickets', async () => {
+  for (const n of ['Isaac', 'Adrian', 'Josué']) assert.ok(pins[n], n + ' debe existir');
+  const isa = await login('Isaac');
+  const me = await isa('GET', '/api/me');
+  assert.strictEqual(me.body.role, 'op'); assert.strictEqual(me.body.dept, 'Retornos'); assert.deepStrictEqual(me.body.perms, []);
+  const r = await isa('POST', '/api/incidents', { type: 'producto', code: 'MX-4100001' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await isa('GET', '/api/tickets')).status, 403);
+  assert.strictEqual((await isa('POST', '/api/users', { name: 'Otro', profile: 'operacion' })).status, 403);
+});
+
+test('alta, baja y reactivación de usuarios (solo con permiso)', async () => {
+  const fr = await login('Francisco R.'), vic = await login('Victor');
+  assert.strictEqual((await vic('POST', '/api/users', { name: 'Luis', profile: 'retornos' })).status, 403, 'Victor no administra usuarios');
+  const c = await fr('POST', '/api/users', { name: '  Luis  ', profile: 'retornos' });
+  assert.strictEqual(c.status, 200); assert.match(c.body.pin, /^\d{4}$/);
+  assert.strictEqual((await fr('POST', '/api/users', { name: 'luís', profile: 'operacion' })).status, 409, 'nombre repetido sin importar acentos');
+  assert.strictEqual((await fr('POST', '/api/users', { name: 'Ana', profile: 'superadmin' })).status, 400);
+  pins.Luis = c.body.pin;
+  const luis = await login('Luis');
+  assert.strictEqual((await luis('GET', '/api/me')).body.dept, 'Retornos');
+
+  // Un ticket tomado por alguien que se da de baja vuelve a quedar sin responsable.
+  const sam = await login('Samantha M.');
+  const t = await luis('POST', '/api/incidents', { type: 'producto', code: 'MX-4100002' });
+  assert.strictEqual((await sam('POST', `/api/tickets/${t.body.id}/take`)).status, 200);
+  const samId = (await sam('GET', '/api/me')).body.id;
+  const b = await fr('POST', `/api/users/${samId}/active`, { active: false });
+  assert.strictEqual(b.status, 200); assert.strictEqual(b.body.released, 1);
+  assert.strictEqual((await sam('GET', '/api/me')).status, 401, 'la sesión se cierra');
+  const det = await fr('GET', `/api/tickets/${t.body.id}`);
+  assert.strictEqual(det.body.ticket ? det.body.ticket.owner_id : det.body.owner_id, null);
+  const names = (await (await fetch(base + '/api/login-users')).json()).map(u => u.name);
+  assert.ok(!names.includes('Samantha M.'));
+
+  const frId = (await fr('GET', '/api/me')).body.id;
+  assert.strictEqual((await fr('POST', `/api/users/${frId}/active`, { active: false })).status, 400, 'no se puede dar de baja a sí mismo');
+  assert.strictEqual((await fr('POST', `/api/users/${samId}/active`, { active: true })).status, 200);
+  await login('Samantha M.');
+  const all = (await fr('GET', '/api/users')).body;
+  assert.ok(all.find(u => u.name === 'Samantha M.').active);
+});
+
+test('setup agrega solo a quien falta y reconoce "Josue" como "Josué"', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mxw-seed-'));
+  const d2 = open(path.join(dir, 's.db'));
+  const { hashPin } = require('../src/pin');
+  d2.prepare("INSERT INTO users (name, role, dept, title, perms, pin_hash) VALUES ('Josue','op','Operación','Retornos y apoyo','[]',?)").run(hashPin('0000'));
+  const p = seed(d2, true);
+  assert.ok(p.Isaac && !p['Josué'] && !p.Josue);
+  assert.strictEqual(seed(d2, true), null);
+});

@@ -245,6 +245,52 @@ function research(db, user, id, value) {
   enqueue(db, db.prepare('SELECT * FROM tickets WHERE id=?').get(id));
 }
 
+// ---------- Usuarios ----------
+// Perfiles fijos para dar de alta sin tener que elegir permisos uno por uno.
+const ALL_PERMS = Object.keys(PERMS);
+const PROFILES = {
+  operacion: { label: 'Operación (registra incidencias)', role: 'op', dept: 'Operación', title: 'Procesador(a) de paquetes', perms: [] },
+  retornos: { label: 'Equipo de retornos (registra incidencias)', role: 'op', dept: 'Retornos', title: 'Equipo de retornos', perms: [] },
+  cs: { label: 'Customer Service (panel: tomar, resolver, confirmar duplicado)', role: 'admin', dept: 'Customer Service', title: 'Customer Service', perms: ['take', 'resolve', 'confirmdup'] },
+  procesamiento: { label: 'Procesamiento (panel: todo menos administrar usuarios)', role: 'admin', dept: 'Procesamiento', title: 'Resuelve incidencias', perms: ALL_PERMS.filter(p => p !== 'users') },
+};
+// Nombre comparable: sin acentos, sin mayúsculas ni espacios de más ("Josue" = "Josué").
+const normName = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+function findByName(db, name) { const k = normName(name); return db.prepare('SELECT * FROM users').all().find(u => normName(u.name) === k) || null; }
+
+function createUser(db, actor, body, hashPin, newPin) {
+  need(actor, 'users');
+  const name = String(body.name || '').replace(/\s+/g, ' ').trim();
+  if (name.length < 2 || name.length > 40) fail(400, 'Escribe el nombre (de 2 a 40 caracteres).');
+  const pr = PROFILES[body.profile]; if (!pr) fail(400, 'Elige un perfil válido.');
+  const ex = findByName(db, name);
+  if (ex) fail(409, ex.active ? `Ya existe ${ex.name}.` : `${ex.name} ya existe pero está dado de baja. Usa "Reactivar".`);
+  const pin = newPin();
+  const r = db.prepare('INSERT INTO users (name, role, dept, title, perms, pin_hash) VALUES (?,?,?,?,?,?)')
+    .run(name, pr.role, pr.dept, pr.title, JSON.stringify(pr.perms), hashPin(pin));
+  return { id: Number(r.lastInsertRowid), name, pin };
+}
+// Baja lógica: el usuario no se borra (sus tickets e historial lo siguen nombrando), solo deja de poder entrar.
+function setUserActive(db, actor, id, active) {
+  need(actor, 'users');
+  return tx(db, () => {
+    const u = db.prepare('SELECT * FROM users WHERE id=?').get(id); if (!u) fail(404, 'No existe ese usuario.');
+    if (!active && u.id === actor.id) fail(400, 'No puedes darte de baja a ti mismo.');
+    db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id);
+    let released = 0;
+    if (!active) {
+      db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);
+      const owned = db.prepare(`SELECT id FROM tickets WHERE owner_id=? AND ${isOpenSql}`).all(u.id);
+      for (const t of owned) {
+        db.prepare(`UPDATE tickets SET owner_id=NULL, status=CASE WHEN status='En gestión' THEN 'Abierto' ELSE status END, version=version+1 WHERE id=?`).run(t.id);
+        event(db, t.id, actor, 'asignacion', `Ticket liberado: ${u.name} fue dado de baja`);
+        released++;
+      }
+    }
+    return { name: u.name, active: !!active, released };
+  });
+}
+
 // Proceso programado de plazos. Idempotente: cada cambio está condicionado a que no se haya hecho antes.
 function runDeadlines(db, now = Date.now()) {
   let changes = 0;
@@ -266,4 +312,4 @@ function runDeadlines(db, now = Date.now()) {
 
 module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
-  confirmDup, resolve, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };
+  confirmDup, resolve, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, PROFILES, normName, findByName, createUser, setUserActive, H, D };
