@@ -211,14 +211,22 @@ if (require.main === module) {
   if (!db.prepare('SELECT COUNT(*) n FROM users').get().n) { console.error('No hay usuarios. Corre primero: npm run setup'); process.exit(1); }
   const app = createApp(db);
   const port = Number(process.env.PORT || 8080);
-  setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
-  dm.runDeadlines(db);
-  require('./sheets-sync').start(db);
-  if (require('./retornos-escaneo').enabled()) require('./retornos-escaneo').start(db);
-  app.listen(port, '0.0.0.0', () => {
+  const server = app.listen(port, '0.0.0.0', () => {
+    // Los procesos de fondo arrancan solo si este servidor quedó escuchando (evita dos copias trabajando a la vez).
+    setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
+    dm.runDeadlines(db);
+    require('./sheets-sync').start(db);
+    if (require('./retornos-escaneo').enabled()) require('./retornos-escaneo').start(db);
     const ips = Object.values(require('os').networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
     console.log(`MX Wharehouse · incidencias en http://localhost:${port}`);
     ips.forEach(ip => console.log(`  En la red de la bodega: http://${ip}:${port}`));
+  });
+  server.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`\nYa hay un servidor de MX Wharehouse (u otro programa) usando el puerto ${port}.`);
+      console.error('Si acabas de cambiar la configuración, detén el anterior:  netstat -ano | findstr :' + port + '   y luego   taskkill /PID <número> /F');
+    } else console.error('No se pudo iniciar el servidor: ' + e.message);
+    process.exit(1);
   });
 }
 

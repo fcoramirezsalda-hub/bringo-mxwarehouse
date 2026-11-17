@@ -1,5 +1,12 @@
 # Handoff
 
+## 2026-11-17 (9) · Claude Code · servidor: puerto ocupado sin trabajos de fondo duplicados (v0.5.2)
+
+- En la PC de la bodega, tras `npm run retornos:setup`, el servidor viejo seguía en el puerto 8080 y el nuevo fallaba en bucle (EADDRINUSE).
+- Antes, plazos, copia a Sheets y copia de retornos arrancaban **antes** de `listen`; ahora solo cuando el servidor quedó escuchando.
+- Con el puerto ocupado muestra un mensaje claro (netstat / taskkill) y sale, en vez del error técnico.
+- Pruebas: `npm test` 27/27; simulado con dos servidores en el mismo puerto: el segundo sale sin arrancar nada.
+
 ## 2026-11-17 (9) · Claude Code · MX/ES sin prefijo y orden de EasyShip (v0.5.1)
 
 - Pedido del propietario: poder teclear `4748635` en lugar de `ES-4748635`.
