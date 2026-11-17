@@ -201,6 +201,31 @@ function resolve(db, user, id, text, now = Date.now()) {
     event(db, id, user, 'resolucion', 'Resolvió: ' + r, now);
   });
 }
+// Resolución rápida desde la bandeja (un clic, sin texto). Si el ticket no tiene responsable, quien resuelve lo toma
+// en la misma transacción. No pisa a otro responsable salvo con permiso de transferir. Queda en el historial.
+const QUICK_TEXT = 'Resuelto desde la bandeja (resolución rápida)';
+function quickResolve(db, user, id, now = Date.now()) {
+  need(user, 'resolve');
+  return tx(db, () => {
+    const t = getOpen(db, id);
+    if (t.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.');
+    if (t.owner_id && t.owner_id !== user.id && !can(user, 'transfer')) {
+      const o = db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id);
+      fail(403, `Lo tiene ${o ? o.name : 'otra persona'}; solo el responsable puede resolverlo.`);
+    }
+    // Condicionado al estado leído: si alguien lo tomó o cerró un instante antes, no se resuelve.
+    const r = db.prepare(`UPDATE tickets SET status='Resuelto', owner_id=?, resolution=?, resolved_at=?, version=version+1
+      WHERE id=? AND version=? AND ${isOpenSql}`).run(t.owner_id || user.id, QUICK_TEXT, now, id, t.version);
+    if (!r.changes) fail(409, 'El ticket cambió hace un instante; vuelve a intentarlo.');
+    if (!t.owner_id) event(db, id, user, 'asignacion', 'Tomó el ticket', now);
+    else if (t.owner_id !== user.id) {
+      const o = db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id);
+      event(db, id, user, 'asignacion', `Resolvió un ticket de ${o ? o.name : 'otra persona'}`, now);
+    }
+    event(db, id, user, 'resolucion', 'Resolvió: ' + QUICK_TEXT, now);
+    return { id, folio: folio(id), status: 'Resuelto' };
+  });
+}
 function disposeDone(db, user, id, evidenceId, now = Date.now()) {
   need(user, 'dispose');
   return tx(db, () => {
@@ -274,4 +299,4 @@ function runDeadlines(db, now = Date.now()) {
 
 module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, parseCode, isBare, platOf, codeKeys, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
-  confirmDup, resolve, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };
+  confirmDup, resolve, quickResolve, QUICK_TEXT, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, H, D };

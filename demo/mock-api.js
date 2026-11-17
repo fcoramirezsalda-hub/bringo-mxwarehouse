@@ -191,13 +191,20 @@
     let m = p.match(/^\/api\/users\/(\d+)\/pin$/);
     if (m) { need(u, 'users'); return { name: user(Number(m[1])).name, pin: PIN + ' (en la demo no cambia)' }; }
     if (p === '/api/tickets') {
-      const n = now();
+      const n = now(), s = String(q.q || '').replace(/\s+/g, '');
+      if (s) {
+        if (s.length < 4) fail(400, 'Escribe al menos 4 caracteres del código o la guía.');
+        const c = parseCode(s), lo = s.toLowerCase(), keys = c ? codeKeys(c) : [];
+        return DB.tickets.filter(t => t.status !== 'Descartado' && (keys.includes(t.code) || (t.code && t.code.toLowerCase().includes(lo)) || (t.trk && (t.trk.toLowerCase().includes(lo) || (t.trk.length >= 8 && s.includes(t.trk))))))
+          .sort((a, b) => (isOpen(b) - isOpen(a)) || b.id - a.id).map(row);
+      }
       return DB.tickets.filter(t => t.status !== 'Descartado').filter(t => {
         if (q.status === 'abiertos' && !isOpen(t)) return false;
         if (q.status === 'sin' && (!isOpen(t) || t.owner_id)) return false;
         if (q.status === 'mios' && t.owner_id !== u.id) return false;
         if (q.status === 'espera' && t.status !== 'Esperando respuesta') return false;
         if (q.status === 'dispose' && t.status !== 'Dispose programado') return false;
+        if (q.status === 'resueltos' && t.status !== 'Resuelto') return false;
         if (q.status === 'cerrados' && isOpen(t)) return false;
         if (q.type && t.type !== q.type) return false;
         if (q.plat && t.plat !== q.plat) return false;
@@ -221,6 +228,11 @@
       case 'location': { const o = openT(id); manage(u, o); o.location = String(body.location || '').trim() || null; event(o, u, 'ubicacion', 'Ubicación física: ' + (o.location || 'sin registrar')); break; }
       case 'messages': { needAdmin(u); const b = String(body.body || '').trim(); if (!b && !body.photo) fail(400, 'Escribe un mensaje o adjunta una foto.'); const ev = body.photo ? addEvidence(u, t, body.photo, 'general', 'Envió una foto en el chat') : null; if (b) msg(u, id, b); save(); return { ok: true, evidence_id: ev }; }
       case 'confirm-dup': confirmDup(u, id); break;
+      case 'quick-resolve': { need(u, 'resolve'); const o = openT(id); if (o.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.');
+        if (o.owner_id && o.owner_id !== u.id && !can(u, 'transfer')) fail(403, `Lo tiene ${user(o.owner_id).name}; solo el responsable puede resolverlo.`);
+        const QT = 'Resuelto desde la bandeja (resolución rápida)', prev = o.owner_id;
+        if (!prev) { o.owner_id = u.id; event(o, u, 'asignacion', 'Tomó el ticket'); } else if (prev !== u.id) event(o, u, 'asignacion', `Resolvió un ticket de ${user(prev).name}`);
+        Object.assign(o, { status: 'Resuelto', resolution: QT, resolved_at: now() }); event(o, u, 'resolucion', 'Resolvió: ' + QT); save(); return { id, folio: folio(id), status: 'Resuelto' }; }
       case 'resolve': { need(u, 'resolve'); const o = openT(id); if (o.owner_id !== u.id) fail(403, 'Toma el ticket para resolverlo.'); if (o.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.'); const r = String(body.resolution || '').trim(); if (r.length < 8) fail(400, 'Escribe la resolución final (qué se hizo y dónde quedó el paquete).'); Object.assign(o, { status: 'Resuelto', resolution: r, resolved_at: now() }); event(o, u, 'resolucion', 'Resolvió: ' + r); break; }
       case 'evidence': { needAdmin(u); const eid = addEvidence(u, t, { name: body.name, data: body.data }, body.purpose, body.purpose === 'dispose' ? 'Subió evidencia de disposición' : 'Agregó evidencia'); save(); return { id: eid }; }
       case 'dispose-done': { need(u, 'dispose'); if (t.status !== 'Dispose programado') fail(409, 'El ticket no está en Dispose programado.'); const e = DB.evidence.find(x => x.id === Number(body.evidence_id) && x.ticket_id === id && x.created_at >= t.dispose_scheduled_at); if (!e) fail(400, 'Sube la evidencia de la disposición antes de confirmarla.'); Object.assign(t, { status: 'Dispose realizado', dispose_done_at: now() }); event(t, u, 'dispose', 'Confirmó Dispose realizado con evidencia: ' + e.file_name); break; }

@@ -1,5 +1,22 @@
 # Handoff
 
+## 2026-11-17 (10) · Claude Code · bandeja: buscador, filtros reducidos y resolución rápida (v0.6.0)
+
+- Pedido del propietario. Sin migración ni dependencias nuevas.
+- **Filtros:** la bandeja solo muestra Estado y Responsable. Se agregó el estado "Resueltos" (`status=resueltos`). La API sigue aceptando los filtros anteriores.
+- **Buscador** (lo más usado): campo grande con el foco al entrar (en PC) para escanear o teclear y Enter. `GET /api/tickets?q=` busca por
+  código con o sin prefijo (`4748635` = `MX-`/`ES-4748635`), parte del código o de la guía, y por código de barras largo que contiene la guía.
+  Busca en todos los estados (menos Descartado) e ignora los filtros, con aviso en pantalla. Mínimo 4 caracteres; comodines `%`/`_` escapados.
+- **Botón "Resuelto" en la fila**, sin ventana adicional: `POST /api/tickets/:id/quick-resolve` (`domain.quickResolve`). Requiere permiso
+  `resolve` (CS y Victor). Si no tiene responsable, lo toma en la misma transacción; si lo tiene otra persona, solo con permiso `transfer`
+  (Victor, Francisco R.) y queda el evento. Resolución fija "Resuelto desde la bandeja (resolución rápida)". Condicionado a `version` para no pisar
+  un cambio simultáneo (409). No aplica a Dispose programado. El clic no abre el ticket; tras resolver, el foco vuelve al buscador.
+- En móvil la columna del botón queda fija a la derecha de la tabla.
+- Demo (`demo/mock-api.js`) con las mismas reglas; `demo/dist` regenerado (falta volver a publicarlo en el link de la demo).
+- Pruebas: `npm test` 29/29 (2 nuevas: búsqueda y resolución rápida con permisos). Navegador (Chromium, servidor real): Samantha ve 3 campos,
+  foco en el buscador, `4791234` + Enter → 1 resultado, "Resuelto" → aparece en Resueltos; operador no ve botones; 390 px sin desborde.
+- Pendiente: el propietario confirma los detalles de DECISIONS (pendiente 12), sobre todo si hace falta "Deshacer".
+
 ## 2026-11-17 (9) · Claude Code · servidor: puerto ocupado sin trabajos de fondo duplicados (v0.5.2)
 
 - En la PC de la bodega, tras `npm run retornos:setup`, el servidor viejo seguía en el puerto 8080 y el nuevo fallaba en bucle (EADDRINUSE).

@@ -88,11 +88,22 @@ function createApp(db, opts = {}) {
   app.get('/api/tickets', wrap(req => {
     dm.needAdmin(req.user);
     const q = req.query, w = ["status<>'Descartado'"], p = [];
+    // Búsqueda por código MX/ES (con o sin prefijo) o guía. Busca en todos los estados: ignora los filtros.
+    const s = String(q.q || '').trim().replace(/\s+/g, '').slice(0, 80);
+    if (s) {
+      if (s.length < 4) dm.fail(400, 'Escribe al menos 4 caracteres del código o la guía.');
+      const code = dm.parseCode(s), like = '%' + s.replace(/[\\%_]/g, c => '\\' + c) + '%';
+      w.push(`(code IN (SELECT value FROM json_each(?)) OR code LIKE ? ESCAPE '\\' OR trk LIKE ? ESCAPE '\\' OR (length(trk)>=8 AND instr(?, trk)>0))`);
+      p.push(JSON.stringify(code ? dm.codeKeys(code) : []), like, like, s);
+      const N = names();
+      return db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, id DESC LIMIT 100`).all(...p).map(t => row(t, N));
+    }
     if (q.status === 'abiertos') w.push(dm.isOpenSql);
     else if (q.status === 'sin') w.push(dm.isOpenSql, 'owner_id IS NULL');
     else if (q.status === 'mios') { w.push('owner_id=?'); p.push(req.user.id); }
     else if (q.status === 'espera') w.push("status='Esperando respuesta'");
     else if (q.status === 'dispose') w.push("status='Dispose programado'");
+    else if (q.status === 'resueltos') w.push("status='Resuelto'");
     else if (q.status === 'cerrados') w.push('NOT ' + dm.isOpenSql);
     if (q.type && dm.TYPES[q.type]) { w.push('type=?'); p.push(q.type); }
     if (q.plat === 'MX' || q.plat === 'ES') { w.push('plat=?'); p.push(q.plat); }
@@ -121,6 +132,7 @@ function createApp(db, opts = {}) {
   act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location));
   act('confirm-dup', (req, id) => dm.confirmDup(db, req.user, id, now()));
   act('resolve', (req, id) => dm.resolve(db, req.user, id, req.body.resolution, now()));
+  app.post('/api/tickets/:id/quick-resolve', wrap(req => dm.quickResolve(db, req.user, Number(req.params.id), now())));
   act('dispose-done', (req, id) => dm.disposeDone(db, req.user, id, Number(req.body.evidence_id), now()));
   act('discard', (req, id) => dm.discard(db, req.user, id, req.body.reason, req.body.confirm === true, now()));
   act('restore', (req, id) => dm.restore(db, req.user, id));

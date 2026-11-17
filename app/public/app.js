@@ -12,7 +12,7 @@ const normCode = v => { const m = String(v || '').trim().match(codeRe); return m
 // En el campo de código también vale solo el número (4748635): el agente averigua si es MX o ES.
 const parseCode = v => { const s = String(v || '').trim(); const m = s.match(/^#?(\d{6,9})$/); return normCode(s) || (m ? m[1] : null); };
 
-const S = { rs: { last: null, err: null, q: '', rows: [] }, me: null, view: 'registro', sel: null, tab: 'chat', R: null, last: null, ui: {}, fl: { status: 'abiertos', type: '', owner: '', plat: '', due: '', enr: '' }, users: [], cache: {} };
+const S = { rs: { last: null, err: null, q: '', rows: [] }, me: null, view: 'registro', sel: null, tab: 'chat', R: null, last: null, ui: {}, fl: { status: 'abiertos', owner: '' }, q: '', users: [], cache: {} };
 
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
@@ -80,6 +80,7 @@ async function render() {
   catch (e) { v.innerHTML = `<div class="banner bad"><span class="ic">!</span><div><b>No se pudo cargar</b>${esc(e.message)}</div></div>`; }
 }
 function after() {
+  if (S.view === 'tickets' && !S.sel) { const el = $('#tq'); if (el && matchMedia('(pointer:fine)').matches) { el.focus(); el.select(); } }
   if (S.view === 'escaneo') { const el = $('#rscan'); if (el && !S.rs.keepFocus) el.focus(); S.rs.keepFocus = false; }
   if (S.view === 'registro') { const R = S.R; const el = R && R.focusCode ? $('#code') : (!R || R.step === 1) ? $('#scan') : (R.type === 'otro' ? $('#f-otro') : R.nolabel ? $('#f-desc') : null); if (el) el.focus(); if (R) R.focusCode = false; }
 }
@@ -153,30 +154,31 @@ async function vMisReportes() {
 }
 
 /* ---------- Bandeja ---------- */
-function ticketTable(list, compact) {
-  return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th></tr></thead><tbody>
+// Resolución rápida: solo CS y Victor (permiso "resolver"); el servidor vuelve a validar todo.
+const canQuick = t => can('resolve') && t.open && t.status !== 'Dispose programado' && (!t.owner_id || t.owner_id === S.me.id || can('transfer'));
+function ticketTable(list, compact, quick) {
+  return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th>${quick ? '<th><span class="sr">Acción</span></th>' : ''}</tr></thead><tbody>
   ${list.length ? list.map(t => { const d = dueInfo(t); return `<tr class="click ${d.k === 'late' ? 'late' : d.k === 'soon' ? 'soon' : ''}" data-a="open" data-v="${t.id}" tabindex="0">
     <td class="mono"><b>${t.folio}</b></td><td><span class="mono">${esc(idl(t))}</span> ${t.plat ? `<span class="chip ${t.plat === 'MX' ? 'mx' : 'es'}">${t.plat}</span>` : ''}</td><td>${esc(t.type_label)}${t.other_text ? `<div class="muted small">${esc(t.other_text)}</div>` : ''}</td>
     ${compact ? '' : `<td>${enrChip(t)}</td><td>${esc(t.reporter)}<div class="muted small">${fdt(t.created_at)}</div></td>`}
     <td>${t.owner ? esc(t.owner) : t.open ? '<span class="chip warn">Sin asignar</span>' : '<span class="muted">—</span>'}</td>${compact ? '' : `<td>${t.waiting_dept && t.open ? esc(t.waiting_dept) : '<span class="muted">—</span>'}</td>`}
-    <td>${d.html}</td><td>${stChip(t.status)}</td></tr>`; }).join('') : '<tr><td colspan="9" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
+    <td>${d.html}</td><td>${stChip(t.status)}</td>${quick ? `<td class="qcell">${canQuick(t) ? `<button class="btn sm done" data-a="qres" data-v="${t.id}" title="Marcar ${t.folio} como resuelto">Resuelto</button>` : ''}</td>` : ''}</tr>`; }).join('') : '<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
   </tbody></table></div>`;
 }
 async function vTickets() {
   if (S.sel) return vDetail();
   if (!S.users.length) S.users = await api('GET', '/api/users');
-  const f = S.fl, list = await api('GET', '/api/tickets?' + new URLSearchParams(Object.entries(f).filter(([, v]) => v)));
-  const sel = (id, k, opts) => `<div class="field"><label class="lbl" for="${id}">${{ status: 'Estado', type: 'Motivo', owner: 'Responsable', plat: 'Origen', due: 'Vencimiento', enr: 'Orden' }[k]}</label><select id="${id}" data-fl="${k}">${opts.map(([v, l]) => `<option value="${v}" ${f[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  const f = S.fl, q = S.q, list = await api('GET', '/api/tickets?' + new URLSearchParams(q ? { q } : Object.entries(f).filter(([, v]) => v)));
+  const sel = (id, k, opts) => `<div class="field"><label class="lbl" for="${id}">${{ status: 'Estado', owner: 'Responsable' }[k]}</label><select id="${id}" data-fl="${k}" ${q ? 'disabled' : ''}>${opts.map(([v, l]) => `<option value="${v}" ${f[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   return `<div class="panel-h"><h1>Bandeja de tickets</h1><span class="muted">Compartida por Victor y Customer Service · abrir un ticket no lo asigna · se actualiza sola</span></div>
   <section class="panel"><div class="filtersbar">
-    ${sel('f-st', 'status', [['abiertos', 'Abiertos'], ['sin', 'Sin responsable'], ['mios', 'Asignados a mí'], ['espera', 'Esperando respuesta'], ['dispose', 'Dispose programado'], ['cerrados', 'Cerrados'], ['', 'Todos']])}
-    ${sel('f-ty', 'type', [['', 'Todos'], ...Object.entries(S.me.types)])}
+    <div class="field tsearch"><label class="lbl" for="tq">Buscar por código MX/ES o guía</label>
+      <div class="row"><input type="search" id="tq" class="mono" value="${esc(q)}" placeholder="Escanea o teclea: MX-3015532, 4748635, 1Z999…" autocomplete="off" enterkeyhint="search">
+      <button class="btn" data-a="tq-go">Buscar</button>${q ? '<button class="btn" data-a="tq-clear">Limpiar</button>' : ''}</div></div>
+    ${sel('f-st', 'status', [['abiertos', 'Abiertos'], ['sin', 'Sin responsable'], ['mios', 'Asignados a mí'], ['espera', 'Esperando respuesta'], ['dispose', 'Dispose programado'], ['resueltos', 'Resueltos'], ['cerrados', 'Cerrados'], ['', 'Todos']])}
     ${sel('f-ow', 'owner', [['', 'Todos'], ['sin', 'Sin asignar'], ...S.users.filter(u => u.role === 'admin').map(u => [String(u.id), u.name])])}
-    ${sel('f-pl', 'plat', [['', 'MX y ES'], ['MX', 'Bringgo · MX'], ['ES', 'EasyShip · ES']])}
-    ${sel('f-du', 'due', [['', 'Cualquiera'], ['soon', 'Vence en 24 h'], ['late', 'Vencidos']])}
-    ${sel('f-en', 'enr', [['', 'Cualquiera'], ['buscando', 'Buscando'], ['lista', 'Lista'], ['sin', 'Sin coincidencias'], ['error', 'Error']])}
-  </div></section>
-  <section class="panel" style="padding:6px 8px">${ticketTable(list)}</section>`;
+  </div>${q ? `<p class="small muted" style="margin:8px 0 0">${list.length} resultado${list.length === 1 ? '' : 's'} para <b class="mono">${esc(q)}</b> en todos los estados · los filtros no aplican mientras buscas.</p>` : ''}</section>
+  <section class="panel" style="padding:6px 8px">${ticketTable(list, false, can('resolve'))}</section>`;
 }
 function orderPanel(t) {
   const h = '<div class="panel-h"><h3>Información de la orden</h3><span class="sp"></span>';
@@ -323,12 +325,18 @@ async function tpost(path, body, msg) {
   try { const r = await api('POST', `/api/tickets/${S.sel}/${path}`, body || {}); if (msg) toast(msg); await render(); return r; }
   catch (e) { toast(esc(e.message)); await render(); }
 }
+function tsearch(v) {
+  const q = String(v || '').trim().replace(/\s+/g, '');
+  if (q && q.length < 4) { toast('Escribe al menos 4 caracteres del código o la guía.'); return; }
+  S.q = q; render();
+}
 function openTicket(id) { S.sel = Number(id); S.tab = 'chat'; S.ui = {}; if (S.view !== 'tickets') { history.replaceState(null, '', '#tickets'); S.view = 'tickets'; } render(); scrollTo(0, 0); }
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (e.target.id === 'rscan') { e.preventDefault(); rscan(e.target.value); }
   else if (e.target.id === 'rs-q') { S.rs.q = e.target.value.trim(); render(); }
+  else if (e.target.id === 'tq') { e.preventDefault(); tsearch(e.target.value); }
   else if (e.target.id === 'return-query') { S.returnQuery = e.target.value.trim(); render(); }
   else if (e.target.id === 'scan') identify(e.target.value, 'scan');
   else if (e.target.id === 'code') identify(e.target.value, 'code');
@@ -382,6 +390,14 @@ document.addEventListener('click', async e => {
     case 'type': R.type = v; R.f = {}; await render(); if (v !== 'otro' && !R.nolabel) $('#regbtn')?.focus(); break;
     case 'register': register(); break;
     case 'open': openTicket(v); break;
+    case 'tq-go': tsearch($('#tq').value); break;
+    case 'tq-clear': S.q = ''; render(); break;
+    case 'qres': {
+      // Sin ventana de confirmación (pedido del propietario): un clic resuelve y queda en "Resueltos" y en el historial.
+      el.disabled = true; el.textContent = '…';
+      try { const r = await api('POST', `/api/tickets/${v}/quick-resolve`); toast(`${esc(r.folio)} resuelto · queda en Resueltos`); }
+      catch (err) { toast(esc(err.message)); }
+      await render(); break; }
     case 'back': S.sel = null; S.ui = {}; render(); break;
     case 'tab': S.tab = v; render(); break;
     case 'take': tpost('take', null, 'Ticket tomado'); break;
@@ -418,7 +434,8 @@ document.addEventListener('click', async e => {
 });
 
 /* ---------- Actualización automática ---------- */
-const typing = () => { const a = document.activeElement; return a && $('#view').contains(a) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName); };
+// El buscador de la bandeja siempre tiene el foco (lector): solo cuenta como "escribiendo" si tiene texto sin buscar.
+const typing = () => { const a = document.activeElement; if (a && a.id === 'tq') return a.value.trim() !== S.q; return a && $('#view').contains(a) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName); };
 setInterval(() => {
   if (!S.me || !isAdmin() || typing()) return;
   if (S.view === 'tickets' && !S.ui.photo && (!S.sel || (S.cache.t && S.cache.t.enr_status === 'buscando'))) render();
