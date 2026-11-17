@@ -155,14 +155,24 @@ test('chat: texto, foto o ambos en un envío; la foto queda como evidencia y no 
 });
 
 test('equipo de retornos registra incidencias pero no ve tickets', async () => {
-  for (const n of ['Isaac', 'Adrian', 'Josué']) assert.ok(pins[n], n + ' debe existir');
-  const isa = await login('Isaac');
+  for (const n of ['Adrian', 'Josué']) assert.ok(pins[n], n + ' debe existir');
+  const isa = await login('Josué');
   const me = await isa('GET', '/api/me');
   assert.strictEqual(me.body.role, 'op'); assert.strictEqual(me.body.dept, 'Retornos'); assert.deepStrictEqual(me.body.perms, []);
   const r = await isa('POST', '/api/incidents', { type: 'producto', code: 'MX-4100001' });
   assert.strictEqual(r.status, 200);
   assert.strictEqual((await isa('GET', '/api/tickets')).status, 403);
   assert.strictEqual((await isa('POST', '/api/users', { name: 'Otro', profile: 'operacion' })).status, 403);
+});
+
+test('Isaac es operador de Operación y Janneth es de Customer Service', async () => {
+  const isa = await (await login('Isaac'))('GET', '/api/me');
+  assert.strictEqual(isa.body.role, 'op'); assert.strictEqual(isa.body.dept, 'Operación'); assert.deepStrictEqual(isa.body.perms, []);
+  const jan = await login('Janneth'); const j = await jan('GET', '/api/me');
+  assert.strictEqual(j.body.role, 'admin'); assert.strictEqual(j.body.dept, 'Customer Service');
+  assert.deepStrictEqual(j.body.perms.sort(), ['confirmdup', 'resolve', 'take']);
+  assert.strictEqual((await jan('GET', '/api/tickets')).status, 200);
+  assert.strictEqual((await jan('POST', '/api/users', { name: 'X', profile: 'operacion' })).status, 403);
 });
 
 test('alta, baja y reactivación de usuarios (solo con permiso)', async () => {

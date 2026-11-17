@@ -4,7 +4,7 @@
    Los datos viven solo en este navegador (localStorage). PIN de prueba para todos: 1234. */
 (function () {
   'use strict';
-  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v4', PIN = '1234';
+  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v5', PIN = '1234';
   const TYPES = { inbound: 'Guía no reconocida', producto: 'Sin producto o diferente', danado: 'Dañado o con escurrimiento', extradept: 'Extra Dept', sinetiqueta: 'Sin etiqueta', nouse: 'No use label', duplicado: 'Duplicado', otro: 'Otro' };
   const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
   const DEPTS = ['Bringgo', 'EasyShip', 'Equipo turco', 'Vendedor Amazon', 'Murat (Laredo)', 'Customer Service', 'Procesamiento'];
@@ -15,11 +15,11 @@
   const TEAM = [
     ['Fatima', 'op', 'Operación', 'Procesadora de paquetes', []], ['Mauricio', 'op', 'Operación', 'Procesador de paquetes', []],
     ['Aracely', 'op', 'Operación', 'Procesadora de paquetes', []], ['Michelle', 'op', 'Operación', 'Procesadora de paquetes', []],
-    ['Isaac', 'op', 'Retornos', 'Equipo de retornos', []], ['Adrian', 'op', 'Retornos', 'Equipo de retornos', []], ['Josué', 'op', 'Retornos', 'Equipo de retornos', []],
+    ['Isaac', 'op', 'Operación', 'Operador', []], ['Adrian', 'op', 'Retornos', 'Equipo de retornos', []], ['Josué', 'op', 'Retornos', 'Equipo de retornos', []],
     ['Victor', 'admin', 'Procesamiento', 'Resuelve incidencias', ALL.filter(p => p !== 'users')],
     ['Francisco R.', 'admin', 'Customer Service', 'Customer Service · administrador del sistema', ALL],
     ['Samantha M.', 'admin', 'Customer Service', 'Customer Service', CS], ['Pamela V.', 'admin', 'Customer Service', 'Customer Service', CS],
-    ['Rachel', 'admin', 'Customer Service', 'Customer Service', CS]];
+    ['Rachel', 'admin', 'Customer Service', 'Customer Service', CS], ['Janneth', 'admin', 'Customer Service', 'Customer Service', CS]];
   // Datos de prueba del agente (ficticios, salvo los ejemplos de las capturas del propietario).
   const FAKE = {
     'MX-2900440': { source: 'Bringgo · Accept goods', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['Product Name', 'EVER ADVANCED Rolling Ball Storage Cart'], ['W.T No', 'MX-2900440'], ['ASIN', 'B0BPYBDTC6'], ['Quantity', '1']] },

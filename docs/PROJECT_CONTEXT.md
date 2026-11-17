@@ -69,5 +69,5 @@ Decisión 2026-11-15: MVP nuevo e independiente (el repositorio del WMS original
 - Descartes: permiso restringido, justificación obligatoria, doble confirmación, archivo de auditoría y restauración.
 - Retornos: registro con antiduplicado y creación de ticket desde el retorno.
 - Reloj de prueba "+1 día" para simular vencimientos.
-- Customer Service: Samantha M., Pamela V., Rachel y Francisco R. (también administrador del sistema). Sus permisos son una propuesta.
+- Customer Service: Samantha M., Pamela V., Rachel, Janneth y Francisco R. (también administrador del sistema). Sus permisos son una propuesta.
 - Se quitaron del prototipo el flujo de escaneo correcto, la impresión de etiquetas, Item Lookup y las zonas de despacho, porque quedan fuera del alcance.

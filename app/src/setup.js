@@ -10,8 +10,8 @@ const TEAM = [
   ['Mauricio', 'op', 'Operación', 'Procesador de paquetes', []],
   ['Aracely', 'op', 'Operación', 'Procesadora de paquetes', []],
   ['Michelle', 'op', 'Operación', 'Procesadora de paquetes', []],
+  ['Isaac', 'op', 'Operación', 'Operador', []],
   // Equipo de retornos: solo registra incidencias, sin permisos de CS ni de Victor.
-  ['Isaac', 'op', 'Retornos', 'Equipo de retornos', []],
   ['Adrian', 'op', 'Retornos', 'Equipo de retornos', []],
   ['Josué', 'op', 'Retornos', 'Equipo de retornos', []],
   ['Victor', 'admin', 'Procesamiento', 'Resuelve incidencias', ALL.filter(p => p !== 'users')],
@@ -19,6 +19,7 @@ const TEAM = [
   ['Samantha M.', 'admin', 'Customer Service', 'Customer Service', ['take', 'resolve', 'confirmdup']],
   ['Pamela V.', 'admin', 'Customer Service', 'Customer Service', ['take', 'resolve', 'confirmdup']],
   ['Rachel', 'admin', 'Customer Service', 'Customer Service', ['take', 'resolve', 'confirmdup']],
+  ['Janneth', 'admin', 'Customer Service', 'Customer Service', ['take', 'resolve', 'confirmdup']],
 ];
 
 function seed(db, quiet = false) {

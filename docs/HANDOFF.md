@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-11-17 (8) · Claude Code · Janneth (CS) e Isaac (Operación)
+
+- Equipo base (`app/src/setup.js` y demo): **Janneth** en Customer Service (tomar, resolver, confirmar duplicado) e **Isaac** como operador de **Operación** (antes estaba en Retornos).
+- En la PC de la bodega: `npm run setup` crea a los dos si no existen y muestra sus PINs. Si Isaac ya se había creado desde la pantalla con perfil Retornos, sigue igual (setup no cambia a nadie existente); sus permisos son los mismos.
+- Demo: clave de datos `mxw-demo-v5` (reinicia los datos de la demo).
+
+**Pruebas:** `npm test` 14/14 (nueva: Isaac operador de Operación; Janneth ve la bandeja pero no administra usuarios).
+
 ## 2026-11-17 (7) · Claude Code · correcciones de la revisión (alta/baja de usuarios)
 
 - Demo: "Agregar" no creaba a nadie (la ruta GET `/api/users` respondía también al POST). Corregido.
