@@ -193,7 +193,10 @@ function createApp(db, opts = {}) {
     return db.prepare('SELECT id, name, role, dept, title, perms, active FROM users ORDER BY role DESC, id').all().map(u => ({ ...u, perms: JSON.parse(u.perms) })); }));
   app.get('/api/user-profiles', wrap(req => { dm.need(req.user, 'users'); return Object.entries(dm.PROFILES).map(([id, p]) => ({ id, label: p.label })); }));
   app.post('/api/users', wrap(req => dm.createUser(db, req.user, req.body || {}, hashPin, newPin)));
-  app.post('/api/users/:id/active', wrap(req => dm.setUserActive(db, req.user, Number(req.params.id), !!(req.body || {}).active)));
+  app.post('/api/users/:id/active', wrap(req => {
+    const a = (req.body || {}).active; if (typeof a !== 'boolean') dm.fail(400, 'Indica si la persona queda activa (true o false).');
+    return dm.setUserActive(db, req.user, Number(req.params.id), a);
+  }));
   app.post('/api/users/:id/pin', wrap(req => {
     dm.need(req.user, 'users');
     const u = db.prepare('SELECT id, name FROM users WHERE id=?').get(req.params.id); if (!u) dm.fail(404, 'No existe ese usuario.');

@@ -189,6 +189,7 @@ test('alta, baja y reactivación de usuarios (solo con permiso)', async () => {
   const names = (await (await fetch(base + '/api/login-users')).json()).map(u => u.name);
   assert.ok(!names.includes('Samantha M.'));
 
+  assert.strictEqual((await fr('POST', `/api/users/${samId}/active`, { active: 'true' })).status, 400, 'active debe ser booleano');
   const frId = (await fr('GET', '/api/me')).body.id;
   assert.strictEqual((await fr('POST', `/api/users/${frId}/active`, { active: false })).status, 400, 'no se puede dar de baja a sí mismo');
   assert.strictEqual((await fr('POST', `/api/users/${samId}/active`, { active: true })).status, 200);

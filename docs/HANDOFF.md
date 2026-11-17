@@ -1,5 +1,17 @@
 # Handoff
 
+## 2026-11-17 (7) · Claude Code · correcciones de la revisión (alta/baja de usuarios)
+
+- Demo: "Agregar" no creaba a nadie (la ruta GET `/api/users` respondía también al POST). Corregido.
+- Demo: un usuario dado de baja seguía con sesión abierta; ahora se le cierra, como en el servidor real.
+- Servidor y demo: `POST /api/users/:id/active` exige `active` booleano (antes `"false"` en texto reactivaba). Prueba agregada.
+- Isaac ya está como Operador (área Retornos) en el equipo base. En la PC de la bodega hay que crearlo: `npm run setup` o "Agregar persona".
+
+**Pruebas:** `npm test` 13/13; demo en navegador: Isaac en la lista de inicio, alta de "Luis" muestra PIN, sin errores.
+
+**Sigue pendiente de la revisión:** escaneo de retornos (no existe; bloqueado por pendiente 9 de DECISIONS), bitácora de altas/bajas (pendiente 11),
+área de Josue/Adrian en la base de la bodega, transacción en `setup`, perfiles duplicados en setup/demo.
+
 ## 2026-11-17 (6) · Claude Code · alta/baja de usuarios y equipo de retornos (v0.4.0)
 
 - "Equipo y permisos" ahora tiene **Agregar persona** (nombre + perfil) y botones **Dar de baja / Reactivar**. Solo con el permiso `users` (Francisco R.).

@@ -171,7 +171,7 @@
     }
     if (p === '/api/logout') { try { sessionStorage.removeItem(KEY + '-uid'); } catch {} window.__mxwUid = null; return { ok: true }; }
     let uid = window.__mxwUid; try { uid = uid || Number(sessionStorage.getItem(KEY + '-uid')); } catch {}
-    const u = uid && user(uid); if (!u) fail(401, 'Inicia sesión.');
+    const u = uid && user(uid); if (!u || !u.active) fail(401, 'Inicia sesión.');
     agent(); deadlines();
     if (p === '/api/me') return { ...me(u), types: TYPES, perms_catalog: PERMS, depts: DEPTS, tags: TAGS, outcomes: OUTCOMES };
     if (p === '/api/incidents' && method === 'POST') return create(u, body);
@@ -180,7 +180,7 @@
     if (p === '/api/agent-status') return { online: true, last_seen: DB.hb, note: 'Demo', queue: DB.jobs.filter(j => j.status === 'pending').length };
     if (p === '/api/sheets-status') return { configured: false, last_ok_at: null, last_error: null };
     needAdmin(u);
-    if (p === '/api/users') return DB.users;
+    if (p === '/api/users' && method !== 'POST') return DB.users;
     if (p === '/api/stats') { const d0 = new Date(); d0.setHours(0, 0, 0, 0); const today = DB.tickets.filter(t => t.created_at >= d0.getTime()); const n = now(), op = DB.tickets.filter(isOpen);
       const count = (arr, k) => Object.entries(arr.reduce((a, t) => (a[k(t)] = (a[k(t)] || 0) + 1, a), {}));
       return { today: count(today, t => t.type).map(([type, n]) => ({ type, n })), open: op.length, unassigned: op.filter(t => !t.owner_id).length,
@@ -198,7 +198,7 @@
       return { id, name, pin: PIN + ' (en la demo todos usan este PIN)' };
     }
     let m = p.match(/^\/api\/users\/(\d+)\/active$/);
-    if (m) { need(u, 'users'); const t = user(Number(m[1])); if (!t) fail(404, 'No existe ese usuario.'); const on = !!body.active;
+    if (m) { need(u, 'users'); const t = user(Number(m[1])); if (!t) fail(404, 'No existe ese usuario.'); if (typeof body.active !== 'boolean') fail(400, 'Indica si la persona queda activa (true o false).'); const on = body.active;
       if (!on && t.id === u.id) fail(400, 'No puedes darte de baja a ti mismo.'); t.active = on ? 1 : 0; let released = 0;
       if (!on) for (const k of DB.tickets.filter(x => x.owner_id === t.id && isOpen(x))) { k.owner_id = null; if (k.status === 'En gestión') k.status = 'Abierto'; event(k, u, 'asignacion', `Ticket liberado: ${t.name} fue dado de baja`); released++; }
       save(); return { name: t.name, active: on, released }; }
