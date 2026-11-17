@@ -35,7 +35,7 @@ Decisión 2026-11-15: MVP nuevo e independiente (el repositorio del WMS original
 | Servidor + API | Node.js ≥ 22.13, Express 4.21.2 (`app/src/server.js`) |
 | Base de datos | SQLite integrado de Node (`node:sqlite`), archivo `app/data/incidencias.db`, modo WAL |
 | Reglas de negocio | `app/src/domain.js` (permisos, anti-duplicado, toma atómica, plazos idempotentes) |
-| Interfaz | HTML + JavaScript sin framework (`app/public/`), basada en el prototipo |
+| Interfaz | HTML + JavaScript sin framework (`app/public/`), basada en el prototipo. Diseño horizontal oscuro/claro y español/inglés (`i18n.js`), ver ADR-003 |
 | Sesión | Usuario + PIN de 4 dígitos (scrypt), cookie HttpOnly de 14 h, bloqueo tras 5 intentos |
 | Agente de búsqueda | Proceso aparte `app/src/worker.js` + `app/src/connectors.js` (Playwright, solo lectura) |
 | Evidencias | Archivos en `app/data/evidencias/<ticket>/`, sin borrado desde la aplicación |

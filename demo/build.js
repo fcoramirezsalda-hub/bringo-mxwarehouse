@@ -9,20 +9,23 @@ const swaps = [
   ['url = `/api/evidence/${e.id}`;', "url = e.src || '#';"],
 ];
 for (const [a, b] of swaps) { if (!js.includes(a)) throw new Error('No encontré en app.js: ' + a); js = js.split(a).join(b); }
-const body = rd('app/public/index.html').match(/<body>([\s\S]*?)<script src="app.js"><\/script>/)[1];
+const body = rd('app/public/index.html').match(/<body>([\s\S]*?)<script src="i18n.js"><\/script>\s*<script src="app.js"><\/script>/)[1];
 const css = rd('app/public/app.css') + `
 .demo-banner{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:center;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--hi);color:var(--hi-ink);font-size:.84rem;font-weight:600}
 .demo-banner button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:4px;padding:2px 8px;cursor:pointer;font:inherit}
 `;
+const theme = rd('app/public/index.html').match(/<script>(\/\* Tema[\s\S]*?)<\/script>/)[1];
 const html = `<title>MX Wharehouse</title>
+<script>${theme}</script>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>${css}</style>
 <div class="demo-banner"><span>Demo de la plataforma v${version} · PIN de prueba: 1234 para todos · los datos se guardan solo en este navegador · la búsqueda de órdenes usa datos de prueba</span><button type="button" onclick="mxwDemoReset()">Reiniciar datos</button></div>
 ${body}
 <script>window.MXW_VERSION = '${version}';</script>
 <script>${rd('demo/mock-api.js')}</script>
+<script>${rd('app/public/i18n.js')}</script>
 <script>${js}</script>
 `;
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });

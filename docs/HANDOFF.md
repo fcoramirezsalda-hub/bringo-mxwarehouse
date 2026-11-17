@@ -1,5 +1,18 @@
 # Handoff
 
+## 2026-11-17 (12) · Claude Code · idioma ES/EN, login centrado y diseño horizontal oscuro/claro (v0.8.0)
+
+- **Idioma:** botón ES/EN en la barra superior y en el inicio de sesión. `app/public/i18n.js` traduce en pantalla lo que pinta app.js
+  (diccionario + patrones). No se traducen chat, resolución, justificación, descripción ni el historial. Los `<option>` siguen enviando el valor en español.
+- **Inicio de sesión centrado** (tarjeta al centro, con idioma y tema arriba a la derecha) y **"Agregar persona" centrado** en Equipo y permisos.
+- **Diseño:** barra superior + menú horizontal (antes barra lateral), contenedor centrado de 1440 px, paleta estilo Vuexy, fuente Public Sans.
+  Oscuro por defecto; botón ☀/☾ para el tema claro. Idioma y tema se guardan en cada PC (localStorage). CSS propio, sin plantilla ni dependencias.
+- app.js: solo cambios de presentación (meses según idioma, login, formulario de alta, `translate="no"`, botones de idioma/tema). Sin cambios de API ni de servidor.
+- Demo: `demo/build.js` incluye i18n.js y el script de tema. Regenerada; **falta volver a publicarla** en el link permanente.
+- **Pruebas:** `npm test` sin fallas. Playwright sobre la demo: login ES/EN, bandeja, equipo, registro y detalle en oscuro/claro y ES/EN; 1360 px y 390 px
+  sin scroll horizontal; el selector "Respuesta pendiente de" envía el valor en español; sin errores de consola.
+- **Falta:** visto bueno del propietario sobre colores/menú; decidir si idioma y tema van por persona (DECISIONS pendiente 13); el banner de la demo sigue solo en español.
+
 ## 2026-11-17 (9) · Claude Code · integración a main (v0.7.0)
 
 - Se unió la rama de usuarios (alta/baja, Janneth, Isaac) con main v0.6.1 (escaneo de retornos, búsqueda en bandeja, reabrir). Versión 0.7.0.

@@ -2,9 +2,10 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const I18N = window.MXW_I18N || { tr: s => s, months: () => ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'], setLang() {} };
+const tr = s => I18N.tr(s); // textos de prompt()/confirm(); lo que se pinta lo traduce i18n.js
 const p2 = n => String(n).padStart(2, '0');
-const fdt = ms => { if (!ms) return '—'; const d = new Date(ms); return `${d.getDate()} ${MES[d.getMonth()]} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+const fdt = ms => { if (!ms) return '—'; const d = new Date(ms); return `${d.getDate()} ${I18N.months()[d.getMonth()]} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
 const H = 3600e3, D = 24 * H;
 const dur = ms => { ms = Math.abs(ms); const d = Math.floor(ms / D), h = Math.floor(ms % D / H), m = Math.floor(ms % H / 60e3); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 const codeRe = /^(MX|ES)[\s-]?(\d{5,})$/i;
@@ -44,12 +45,15 @@ function dueInfo(t) {
 async function showLogin() {
   $('#shell').hidden = true; const v = $('#loginview'); v.hidden = false;
   let users = []; try { users = await (await fetch('/api/login-users')).json(); } catch {}
-  v.innerHTML = `<form class="panel login" id="loginform">
-    <div class="brandmark" style="padding:0"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro · <span class="appver"></span></small></div></div>
-    <div class="field"><label class="lbl" for="lu">¿Quién eres?</label><select id="lu">${users.map(u => `<option>${esc(u.name)}</option>`).join('')}</select></div>
+  v.innerHTML = `<div class="authwrap"><div class="authprefs">${prefsHtml()}</div>
+    <form class="panel login" id="loginform">
+    <div class="brandmark"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro · <span class="appver" translate="no"></span></small></div></div>
+    <div><h1>¿Quién eres?</h1><p class="muted small">Inicia sesión para continuar</p></div>
+    <div class="field"><label class="lbl" for="lu">Nombre</label><select id="lu" translate="no">${users.map(u => `<option>${esc(u.name)}</option>`).join('')}</select></div>
     <div class="field"><label class="lbl" for="lp">PIN</label><input id="lp" class="pinpad" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>
     <p class="err" id="lerr" role="alert"></p>
-    <button class="btn brand" type="submit">Entrar</button></form>`;
+    <button class="btn brand full" type="submit">Entrar</button></form></div>`;
+  syncPrefs();
   $('#lp').focus(); showVersion();
   $('#loginform').onsubmit = async e => {
     e.preventDefault();
@@ -69,9 +73,9 @@ const hasReturns = () => !!S.me && !!S.me.returns_mode && S.me.returns_mode !== 
 const hasScan = () => !!S.me && S.me.returns_scan === true;
 const navFor = () => { const ret = hasReturns() ? [['retornos']] : [], sc = hasScan() ? [['escaneo']] : []; return isAdmin() ? [['grp', 'Gestión'], ['tickets'], ['tablero'], ['duplicados'], ['danados'], ['descartes'], ['grp', 'Piso'], ['registro'], ...sc, ...ret, ['grp', 'Personal'], ['equipo']] : [['grp', 'Mi estación'], ['registro'], ...sc, ['misreportes'], ...ret]; };
 function renderNav() {
-  $('#nav').innerHTML = navFor().map(([k, l]) => k === 'grp' ? `<div class="grp lbl">${l}</div>` : `<a href="#${k}" class="${S.view === k ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${TITLES[k]}</a>`).join('');
+  $('#nav').innerHTML = navFor().map(([k, l]) => k === 'grp' ? `<span class="grp lbl">${l}</span>` : `<a href="#${k}" class="${S.view === k ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${TITLES[k]}</a>`).join('');
   $('#crumb').innerHTML = `${isAdmin() ? 'Panel administrativo' : 'Operación'} › <b>${S.sel && S.view === 'tickets' ? 'Ticket' : TITLES[S.view]}</b>`;
-  $('#who').textContent = S.me.name; $('#rolechip').textContent = isAdmin() ? S.me.dept : 'Operador';
+  $('#who').textContent = S.me.name; $('#whoav').textContent = (S.me.name || '?')[0]; $('#rolechip').textContent = isAdmin() ? S.me.dept : 'Operador';
 }
 async function render() {
   renderNav();
@@ -111,7 +115,7 @@ function vRegistro() {
   const types = Object.keys(S.me.types).filter(k => !(R && R.nolabel && !['sinetiqueta', 'otro'].includes(k)));
   const ready = R && R.type && !missing(R).length;
   return `<div class="reg"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-  ${S.last ? `<div class="banner ok"><span class="ic">✓</span><div><b>${S.last.appended ? 'Agregado a ' + S.last.folio : 'Registrado ' + S.last.folio}</b>${esc(S.last.label)} · ${S.last.appended ? 'se agregó al ticket abierto' : S.last.status === 'Enviado dañado' ? 'quedó en el registro de enviados dañados' : 'ticket abierto; Victor y Customer Service ya lo ven'}.</div></div>` : ''}
+  ${S.last ? `<div class="banner ok"><span class="ic">✓</span><div><b>${S.last.appended ? 'Agregado a ' + S.last.folio : 'Registrado ' + S.last.folio}</b><span>${esc(S.last.label)}</span> · <span>${S.last.appended ? 'se agregó al ticket abierto.' : S.last.status === 'Enviado dañado' ? 'quedó en el registro de enviados dañados.' : 'ticket abierto; Victor y Customer Service ya lo ven.'}</span></div></div>` : ''}
   <section class="stepcard ${cls(1)}">
     <div class="stephead"><span class="stepn">1</span><h2>Identifica el paquete</h2><span class="sp"></span>${s > 1 ? '<button class="btn sm" data-a="restart">Cambiar</button>' : ''}</div>
     ${s === 1 ? `<div class="field"><label class="lbl" for="scan">Escanea la guía</label>
@@ -160,7 +164,7 @@ const canReopen = t => t.status === 'Resuelto' && (can('restore') || (t.resolved
 function ticketTable(list, compact, quick) {
   return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th>${quick ? '<th><span class="sr">Acción</span></th>' : ''}</tr></thead><tbody>
   ${list.length ? list.map(t => { const d = dueInfo(t); return `<tr class="click ${d.k === 'late' ? 'late' : d.k === 'soon' ? 'soon' : ''}" data-a="open" data-v="${t.id}" tabindex="0">
-    <td class="mono"><b>${t.folio}</b></td><td><span class="mono">${esc(idl(t))}</span> ${t.plat ? `<span class="chip ${t.plat === 'MX' ? 'mx' : 'es'}">${t.plat}</span>` : ''}</td><td>${esc(t.type_label)}${t.other_text ? `<div class="muted small">${esc(t.other_text)}</div>` : ''}</td>
+    <td class="mono"><b>${t.folio}</b></td><td><span class="mono">${esc(idl(t))}</span> ${t.plat ? `<span class="chip ${t.plat === 'MX' ? 'mx' : 'es'}">${t.plat}</span>` : ''}</td><td>${esc(t.type_label)}${t.other_text ? `<div class="muted small" translate="no">${esc(t.other_text)}</div>` : ''}</td>
     ${compact ? '' : `<td>${enrChip(t)}</td><td>${esc(t.reporter)}<div class="muted small">${fdt(t.created_at)}</div></td>`}
     <td>${t.owner ? esc(t.owner) : t.open ? '<span class="chip warn">Sin asignar</span>' : '<span class="muted">—</span>'}</td>${compact ? '' : `<td>${t.waiting_dept && t.open ? esc(t.waiting_dept) : '<span class="muted">—</span>'}</td>`}
     <td>${d.html}</td><td>${stChip(t.status)}</td>${quick ? `<td class="qcell">${canQuick(t) ? `<button class="btn sm done" data-a="qres" data-v="${t.id}" title="Marcar ${t.folio} como resuelto">Resuelto</button>` : canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" title="Reabrir ${t.folio}">Reabrir</button>` : ''}</td>` : ''}</tr>`; }).join('') : '<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
@@ -203,9 +207,9 @@ async function vDetail() {
   const tabs = [['chat', `Chat interno (${t.messages.length + t.evidence.length})`], ['hist', `Historial (${t.events.length})`]];
   const bubble = it => {
     const head = `<div class="mh"><b>${esc(it.who)}</b><span>${fdt(it.at)}</span>${it.k === 'm' && it.m.tag !== 'Mensaje' ? `<span class="chip ${it.m.tag.includes('turco') ? 'info' : 'warn'}">${esc(it.m.tag)}</span>` : ''}${it.k === 'e' && it.e.purpose === 'dispose' ? '<span class="chip bad">Evidencia de disposición</span>' : ''}</div>`;
-    if (it.k === 'm') return `<div class="msg ${it.who === S.me.name ? 'mine' : ''}">${head}${esc(it.m.body)}</div>`;
+    if (it.k === 'm') return `<div class="msg ${it.who === S.me.name ? 'mine' : ''}">${head}<div translate="no">${esc(it.m.body)}</div></div>`;
     const e = it.e, url = `/api/evidence/${e.id}`;
-    return `<div class="msg photo ${it.who === S.me.name ? 'mine' : ''}">${head}<a href="${url}" target="_blank" rel="noopener">${e.mime.startsWith('image/') ? `<img src="${url}" alt="${esc(e.file_name)}" loading="lazy">` : `<span class="chip neutral">PDF · ${esc(e.file_name)}</span>`}</a>${it.caption ? `<div class="caption">${esc(it.caption)}</div>` : ''}</div>`;
+    return `<div class="msg photo ${it.who === S.me.name ? 'mine' : ''}">${head}<a href="${url}" target="_blank" rel="noopener">${e.mime.startsWith('image/') ? `<img src="${url}" alt="${esc(e.file_name)}" loading="lazy">` : `<span class="chip neutral">PDF · ${esc(e.file_name)}</span>`}</a>${it.caption ? `<div class="caption" translate="no">${esc(it.caption)}</div>` : ''}</div>`;
   };
   // Foto y texto enviados juntos (misma persona, menos de 5 s) se muestran en una sola burbuja.
   for (let i = 0; i < chatItems.length - 1; i++) {
@@ -213,7 +217,7 @@ async function vDetail() {
     if (a.k === 'e' && b.k === 'm' && a.who === b.who && Math.abs(b.at - a.at) < 5000 && !a.caption && b.m.tag === 'Mensaje') { a.caption = b.m.body; chatItems.splice(i + 1, 1); }
   }
   const pending = S.ui.photo ? `<span class="chip ok">Foto: ${esc(S.ui.photo.name)} <button class="linkx" data-a="nophoto" aria-label="Quitar foto">✕</button></span>` : '';
-  const tab = S.tab === 'hist' ? `<ul class="timeline">${t.events.map(e => `<li><span class="mono muted">${fdt(e.created_at)}</span><span><b>${esc(e.who)}</b> · ${esc(e.text)}</span></li>`).join('')}</ul>`
+  const tab = S.tab === 'hist' ? `<ul class="timeline">${t.events.map(e => `<li><span class="mono muted">${fdt(e.created_at)}</span><span translate="no"><b>${esc(e.who)}</b> · ${esc(e.text)}</span></li>`).join('')}</ul>`
     : `${!chatItems.length && !S.ui.chatOpen ? `<div class="empty"><h3>Sin conversación</h3><p>El chat se abre cuando hace falta coordinar algo. Aquí también se suben las fotos.</p><button class="btn brand" style="margin-top:12px" data-a="openchat">Iniciar conversación</button></div>`
       : `<div class="chat">${chatItems.map(bubble).join('')}
         <div class="field composer"><textarea id="cmsg" data-ui="cmsg" placeholder="Escribe un mensaje o una instrucción recibida">${esc(S.ui.cmsg || '')}</textarea>
@@ -232,12 +236,12 @@ async function vDetail() {
         <div><div class="lbl">Ubicación física</div><div class="v">${esc(t.location || 'Sin registrar')}</div></div>
         <div><div class="lbl">Fecha límite</div><div class="v num">${fdt(t.due_at)}</div><div class="muted small">${t.dup_confirmed_at ? 'duplicado (10 d)' : 'general (3 d)'}</div></div>
         ${t.trk && t.code ? `<div><div class="lbl">Guía escaneada</div><div class="v mono">${esc(t.trk)}</div></div>` : ''}
-        ${t.other_text ? `<div><div class="lbl">Motivo especificado</div><div class="v">${esc(t.other_text)}</div></div>` : ''}
-        ${t.description ? `<div><div class="lbl">Descripción</div><div class="v">${esc(t.description)}</div></div>` : ''}
+        ${t.other_text ? `<div><div class="lbl">Motivo especificado</div><div class="v" translate="no">${esc(t.other_text)}</div></div>` : ''}
+        ${t.description ? `<div><div class="lbl">Descripción</div><div class="v" translate="no">${esc(t.description)}</div></div>` : ''}
         ${t.type === 'danado' ? `<div><div class="lbl">Desenlace del envío</div><div class="v">${esc(t.damage_outcome)}</div></div>` : ''}
       </div>
-      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b>${esc(t.resolution)}</div>${canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" style="margin-left:auto">Reabrir</button>` : ''}</div>` : ''}
-      ${t.status === 'Descartado' ? `<div class="banner bad" style="margin-top:14px"><span class="ic">!</span><div><b>Descartado por ${esc(t.discarded_by)} · ${fdt(t.discarded_at)}</b>${esc(t.discard_reason)}</div></div>` : ''}
+      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b><span translate="no">${esc(t.resolution)}</span></div>${canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" style="margin-left:auto">Reabrir</button>` : ''}</div>` : ''}
+      ${t.status === 'Descartado' ? `<div class="banner bad" style="margin-top:14px"><span class="ic">!</span><div><b>Descartado por ${esc(t.discarded_by)} · ${fdt(t.discarded_at)}</b><span translate="no">${esc(t.discard_reason)}</span></div></div>` : ''}
     </section>
     ${orderPanel(t)}
     <section class="panel"><div class="panel-h"><div class="tabs">${tabs.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-a="tab" data-v="${k}">${l}</button>`).join('')}</div></div>${tab}</section>
@@ -292,7 +296,7 @@ async function vDescartes() {
   const list = await api('GET', '/api/discarded');
   return `<div class="panel-h"><h1>Archivo de descartes</h1><span class="muted">Auditoría · nada se borra</span></div>
   <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código</th><th>Motivo</th><th>Descartó</th><th>Justificación</th><th></th></tr></thead><tbody>
-  ${list.map(t => `<tr><td class="mono"><b>${t.folio}</b></td><td class="mono">${esc(idl(t))}</td><td>${esc(t.type_label)}</td><td>${esc(t.discarded_by)}<div class="muted small">${fdt(t.discarded_at)}</div></td><td>${esc(t.discard_reason)}</td><td><button class="btn sm" data-a="open" data-v="${t.id}">Ver expediente</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No hay descartes.</td></tr>'}
+  ${list.map(t => `<tr><td class="mono"><b>${t.folio}</b></td><td class="mono">${esc(idl(t))}</td><td>${esc(t.type_label)}</td><td>${esc(t.discarded_by)}<div class="muted small">${fdt(t.discarded_at)}</div></td><td translate="no">${esc(t.discard_reason)}</td><td><button class="btn sm" data-a="open" data-v="${t.id}">Ver expediente</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No hay descartes.</td></tr>'}
   </tbody></table></div></section>`;
 }
 async function vEquipo() {
@@ -307,12 +311,11 @@ async function vEquipo() {
       : `<button class="btn sm" data-a="ualta" data-v="${u.id}">Reactivar</button>`) : ''}</td></tr>`;
   return `<div class="panel-h"><h1>Equipo y permisos</h1></div>
   ${S.ui.newpin ? `<div class="banner ok"><span class="ic">✓</span><div><b>${S.ui.newpin.created ? 'Usuario creado. ' : 'Nuevo '}PIN de ${esc(S.ui.newpin.name)}: <span class="mono">${esc(S.ui.newpin.pin)}</span></b>Entrégalo en persona. No se vuelve a mostrar.</div></div>` : ''}
-  ${admin ? `<section class="panel"><div class="panel-h"><h2>Agregar persona</h2><span class="sp"></span><span class="muted">entra con su nombre y un PIN de 4 dígitos</span></div>
-    <div class="row" style="align-items:flex-end">
-      <div class="field" style="flex:1 1 180px"><label class="lbl" for="nuname">Nombre</label><input id="nuname" maxlength="40" autocomplete="off" placeholder="Ej. Isaac"></div>
-      <div class="field" style="flex:2 1 260px"><label class="lbl" for="nuprof">Perfil</label><select id="nuprof">${S.profiles.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('')}</select></div>
-      <button class="btn primary" data-a="ualta-new">Agregar</button>
-    </div></section>` : ''}
+  ${admin ? `<section class="panel formcard"><div class="formcard-h"><h2>Agregar persona</h2><p class="muted small">entra con su nombre y un PIN de 4 dígitos</p></div>
+      <div class="field"><label class="lbl" for="nuname">Nombre</label><input id="nuname" type="text" maxlength="40" autocomplete="off" placeholder="Ej. Isaac"></div>
+      <div class="field"><label class="lbl" for="nuprof">Perfil</label><select id="nuprof">${S.profiles.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join('')}</select></div>
+      <button class="btn primary full" data-a="ualta-new">Agregar</button>
+    </section>` : ''}
   <section class="panel" style="padding:6px 8px"><div class="tbl-wrap"><table><thead><tr><th>Persona</th><th>Rol</th><th>Área</th><th>Estado</th><th></th></tr></thead><tbody>
   ${act.map(rowU).join('')}${inact.map(rowU).join('')}
   </tbody></table></div></section>
@@ -386,7 +389,7 @@ document.addEventListener('click', async e => {
       catch (err) { toast(esc(err.message)); } break;
     case 'rs-pick': { const r = (S.rs.rows || []).find(x => x.id === Number(v)); if (r) { S.rs.last = r; S.rs.err = null; render(); scrollTo(0, 0); } break; }
     case 'rs-void': {
-      const reason = prompt('¿Por qué se anula este escaneo? (queda en el historial y en Observaciones de la hoja)'); if (!reason) break;
+      const reason = prompt(tr('¿Por qué se anula este escaneo? (queda en el historial y en Observaciones de la hoja)')); if (!reason) break;
       try { S.rs.last = await api('POST', `/api/rscan/${v}/void`, { reason }); await render(); } catch (err) { toast(esc(err.message)); } break;
     }
     case 'return-search': S.returnQuery = $('#return-query').value.trim(); render(); break;
@@ -399,6 +402,8 @@ document.addEventListener('click', async e => {
       try { await api('POST', '/api/returns/' + encodeURIComponent(v) + '/status', { status: document.getElementById('rs-' + v).value }); await render(); }
       catch (err) { toast(esc(err.message)); el.disabled = false; } break;
     case 'logout': await api('POST', '/api/logout'); showLogin(); break;
+    case 'lang': I18N.setLang(v); break;
+    case 'theme': setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'); break;
     case 'scan': identify($('#scan').value, 'scan'); break;
     case 'usecode': identify($('#code').value, 'code'); break;
     case 'nolabel': S.last = null; S.R = { ...newR(), step: 2, type: 'sinetiqueta', nolabel: true, src: 'Sin etiqueta', code: null, trk: null }; render(); break;
@@ -455,7 +460,7 @@ document.addEventListener('click', async e => {
         const r = await api('POST', '/api/users', { name: $('#nuname').value, profile: $('#nuprof').value });
         S.ui.newpin = { ...r, created: true }; S.users = []; render();
       } catch (err) { toast(esc(err.message)); } break;
-    case 'ubaja': { const u = S.users.find(x => x.id === Number(v)); if (!u || !confirm(`¿Dar de baja a ${u.name}? Ya no podrá entrar. Sus tickets abiertos quedan sin responsable. Su historial se conserva y se puede reactivar.`)) break;
+    case 'ubaja': { const u = S.users.find(x => x.id === Number(v)); if (!u || !confirm(tr(`¿Dar de baja a ${u.name}? Ya no podrá entrar. Sus tickets abiertos quedan sin responsable. Su historial se conserva y se puede reactivar.`))) break;
       try { const r = await api('POST', `/api/users/${v}/active`, { active: false }); toast(`${esc(r.name)} dado de baja${r.released ? ` · ${r.released} ticket(s) liberados` : ''}`); S.ui = {}; S.users = []; render(); } catch (err) { toast(esc(err.message)); } break; }
     case 'ualta': try { const r = await api('POST', `/api/users/${v}/active`, { active: true }); toast(`${esc(r.name)} reactivado`); S.ui = {}; S.users = []; render(); } catch (err) { toast(esc(err.message)); } break;
   }
@@ -473,6 +478,22 @@ async function agentStatus() {
   try { const s = await api('GET', '/api/agent-status'); $('#agent').innerHTML = `<span class="dot ${s.online ? '' : 'agentdot off'}"></span> Agente de búsqueda · ${s.online ? 'en línea' : 'sin conexión' + (s.last_seen ? ' desde ' + fdt(s.last_seen) : '')}${s.queue ? ` · ${s.queue} en cola` : ''}`; } catch {}
 }
 setInterval(agentStatus, 10000);
+
+/* ---------- Preferencias: tema (oscuro / claro) e idioma, guardadas en este navegador ---------- */
+const prefsHtml = () => `<div class="prefs"><div class="langsw" role="group" aria-label="Idioma"><button type="button" data-lang-btn="es" data-a="lang" data-v="es" translate="no">ES</button><button type="button" data-lang-btn="en" data-a="lang" data-v="en" translate="no">EN</button></div>
+  <button type="button" class="iconbtn" data-a="theme" title="" aria-label=""><svg viewBox="0 0 24 24" class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg viewBox="0 0 24 24" class="i-moon"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button></div>`;
+function syncPrefs() {
+  const light = document.documentElement.dataset.theme === 'light', lbl = light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro';
+  document.querySelectorAll('[data-a="theme"]').forEach(b => { b.title = lbl; b.setAttribute('aria-label', lbl); });
+  document.querySelectorAll('[data-lang-btn]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.langBtn === I18N.lang)));
+}
+function setTheme(th) {
+  document.documentElement.dataset.theme = th;
+  try { localStorage.setItem('mxw-theme', th); } catch {}
+  syncPrefs();
+}
+document.addEventListener('mxw:lang', () => { syncPrefs(); if (S.me && !$('#shell').hidden) { render(); agentStatus(); } });
+syncPrefs();
 
 async function showVersion() {
   try { const v = await (await fetch('/api/version')).json(); document.querySelectorAll('.appver').forEach(el => el.textContent = 'v' + v.version); } catch {}

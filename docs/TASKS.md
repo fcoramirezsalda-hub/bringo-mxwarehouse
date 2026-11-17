@@ -64,6 +64,7 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 
 | # | Tarea | Responsable | Fecha |
 |---|---|---|---|
+| I.1 | Idioma ES/EN, inicio de sesión y "Agregar persona" centrados, diseño horizontal oscuro/claro (ADR-003) | Claude Code | 2026-11-17 |
 | U.1 | Alta, baja y reactivación de usuarios desde "Equipo y permisos"; equipo de retornos (Isaac, Adrian, Josué) | Claude Code | 2026-11-17 |
 | M.1 | MVP de incidencias en `app/` (servidor, BD, interfaz, agente, pruebas) | Claude Code | 2026-11-15 |
 

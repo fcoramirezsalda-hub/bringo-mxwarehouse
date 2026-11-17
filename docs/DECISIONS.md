@@ -34,6 +34,7 @@
 | 2026-11-17 | Equipo de retornos: Adrian y Josué (Isaac pasó a Operación, ver abajo). Solo registran incidencias (perfil operador, área "Retornos"); sin permisos de CS ni de Victor. | Propietario |
 | 2026-11-17 | Usuarios se agregan y se dan de baja desde "Equipo y permisos" con perfiles fijos. La baja es lógica (no se borra): no puede entrar, sus tickets abiertos quedan sin responsable y se puede reactivar. Nadie se da de baja a sí mismo. | Propietario (pedido) · Claude Code (diseño) |
 | 2026-11-17 | Usuarios nuevos: Janneth en Customer Service (mismos permisos que Samantha, Pamela y Rachel) e Isaac como operador de Operación. | Propietario |
+| 2026-11-17 | Interfaz en español e inglés (botón ES/EN, también en el inicio de sesión), inicio de sesión y "Agregar persona" centrados, y diseño horizontal oscuro estilo Vuexy con opción a claro. Idioma y tema se guardan por PC; el historial y lo que escribe la gente no se traducen. Ver ADR-003. | Propietario (pedido) · Claude Code (diseño) |
 
 ## Pendientes (requieren respuesta del propietario)
 
@@ -49,3 +50,4 @@
 10. **Motivos que se resuelven en piso** (Guía no reconocida, Extra Dept, No use label): con el registro de 3 clicks hoy abren ticket. ¿Deben registrarse directo como "Resuelto en piso" (solo historial)?
 11. **Número sin MX/ES repetido en las dos plataformas:** si `4748635` existe como MX y como ES, el agente muestra ambas y pide buscar de nuevo con el prefijo. ¿Pasa en la práctica? Si los rangos no se cruzan (hoy MX ≈ 2.9–3.0 M y ES ≈ 4.4–4.7 M), se podría decidir la plataforma al instante por el rango.
 12. **Bitácora de altas y bajas de usuarios:** hoy no queda registro de quién agregó o dio de baja a alguien (requiere una tabla nueva, es decir, una migración). ¿Se aprueba?
+13. **Idioma y tema por persona o por PC:** hoy se guardan en cada navegador. ¿Debe seguir a la persona en cualquier PC? (requiere una columna nueva, es decir, una migración).
