@@ -39,12 +39,14 @@ else {
 }
 
 Paso '3/7 Base de datos y usuarios'
-if (Test-Path 'data\incidencias.db') { Ok 'Ya existe; no se cambió nada.' }
-else {
-  npm run setup
+# setup no cambia nada si ya hay usuarios; se corre siempre porque la base puede existir vacía
+# (por ejemplo, si el servidor se arrancó antes que el instalador).
+npm run setup | Tee-Object -Variable salidaSetup
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo crear la base de datos.' }
+if (($salidaSetup -join "`n") -match 'Usuarios creados') {
   Aviso 'Anota los PIN de arriba y entrégalos en persona. No se vuelven a mostrar.'
   Read-Host 'Presiona Enter cuando los hayas anotado'
-}
+} else { Ok 'Ya había usuarios; no se cambió nada.' }
 
 Paso '4/7 Arranque automático al iniciar sesión'
 foreach ($n in @(@{Nombre='MX Wharehouse - Servidor'; Bat='iniciar-servidor.bat'}, @{Nombre='MX Wharehouse - Agente'; Bat='iniciar-agente.bat'})) {

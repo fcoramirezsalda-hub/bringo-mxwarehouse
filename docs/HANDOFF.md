@@ -1,5 +1,12 @@
 # Handoff
 
+## 2026-11-17 (6) · Claude Code · instalador: crear usuarios aunque la base ya exista
+
+- En la PC de la bodega el servidor decía "No hay usuarios": `iniciar-servidor.bat` se corrió antes que el instalador,
+  el servidor creó `data\incidencias.db` vacía y el paso 3 la saltó porque solo revisaba si existía el archivo.
+- Ahora el paso 3 siempre corre `npm run setup` (no cambia nada si ya hay usuarios) y solo pide anotar PIN si se crearon.
+- Arreglo inmediato en la PC: `npm run setup` en la carpeta `app`. No probado con PowerShell en este entorno.
+
 ## 2026-11-17 (5) · Claude Code · instalador arranca el sistema y lo comprueba
 
 - En la PC de la bodega el instalador terminó, pero http://localhost:8080 no respondía y no se vio Edge en el paso 6.
