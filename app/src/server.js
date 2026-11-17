@@ -29,6 +29,8 @@ function createApp(db, opts = {}) {
     catch (e) { if (e instanceof dm.HttpError) res.status(e.status).json({ error: e.message }); else { console.error(e); res.status(500).json({ error: 'Error interno. Revisa la consola del servidor.' }); } }
   };
 
+  const VERSION = require('../package.json').version;
+  app.get('/api/version', (req, res) => res.json({ version: VERSION }));
   app.get('/api/login-users', (req, res) => res.json(db.prepare('SELECT name, role FROM users WHERE active=1 ORDER BY role DESC, id').all()));
   app.post('/api/login', wrap((req, res) => {
     const name = String(req.body.name || ''), pin = String(req.body.pin || '');
@@ -183,7 +185,7 @@ function createApp(db, opts = {}) {
     return { name: u.name, pin };
   }));
 
-  app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
+  app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html', setHeaders: r => r.set('Cache-Control', 'no-cache') }));
   return app;
 }
 

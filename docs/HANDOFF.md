@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-11-17 · Claude Code · versión visible (v0.2.0)
+
+- La versión (`app/package.json`, ahora 0.2.0) se muestra en el inicio de sesión y en la barra lateral, vía `GET /api/version`.
+  Sirve para comparar si dos instalaciones corren el mismo código.
+- Los archivos de la interfaz se sirven con `Cache-Control: no-cache` para que el navegador no muestre una versión vieja.
+- Al publicar cambios en la interfaz, subir la versión en `app/package.json`.
+- Probado: 9/9 pruebas; en navegador se ve "v0.2.0" en login y panel.
+
 ## 2026-11-16 · Claude Code · rama `agente/claude/instalador-windows`
 
 - `app/instalar-windows.bat` + `app/instalar-windows.ps1`: instalador para la PC de la bodega (Node ≥ 22.13, npm install, Chromium del agente,

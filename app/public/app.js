@@ -43,12 +43,12 @@ async function showLogin() {
   $('#shell').hidden = true; const v = $('#loginview'); v.hidden = false;
   let users = []; try { users = await (await fetch('/api/login-users')).json(); } catch {}
   v.innerHTML = `<form class="panel login" id="loginform">
-    <div class="brandmark" style="padding:0"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro</small></div></div>
+    <div class="brandmark" style="padding:0"><div class="sq">MX</div><div><b>MX Wharehouse</b><small>Incidencias de registro · <span class="appver"></span></small></div></div>
     <div class="field"><label class="lbl" for="lu">¿Quién eres?</label><select id="lu">${users.map(u => `<option>${esc(u.name)}</option>`).join('')}</select></div>
     <div class="field"><label class="lbl" for="lp">PIN</label><input id="lp" class="pinpad" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>
     <p class="err" id="lerr" role="alert"></p>
     <button class="btn brand" type="submit">Entrar</button></form>`;
-  $('#lp').focus();
+  $('#lp').focus(); showVersion();
   $('#loginform').onsubmit = async e => {
     e.preventDefault();
     try { await api('POST', '/api/login', { name: $('#lu').value, pin: $('#lp').value }); await boot(); }
@@ -369,6 +369,10 @@ async function agentStatus() {
 }
 setInterval(agentStatus, 10000);
 
+async function showVersion() {
+  try { const v = await (await fetch('/api/version')).json(); document.querySelectorAll('.appver').forEach(el => el.textContent = 'v' + v.version); } catch {}
+}
+showVersion();
 async function boot() {
   try { S.me = await api('GET', '/api/me'); } catch { return; }
   $('#loginview').hidden = true; $('#shell').hidden = false; S.R = null; S.last = null; S.users = [];
