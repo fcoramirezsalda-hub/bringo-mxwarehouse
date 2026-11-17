@@ -17,7 +17,7 @@ const PERMS = {
   resolve: 'Resolver',
   confirmdup: 'Confirmar duplicado',
   discard: 'Descartar incidencia',
-  restore: 'Restaurar descartada',
+  restore: 'Restaurar descartada / reabrir resueltos de otros',
   dispose: 'Confirmar Dispose realizado',
   users: 'Administrar usuarios',
 };
@@ -32,6 +32,14 @@ const fail = (status, msg) => { throw new HttpError(status, msg); };
 
 const codeRe = /^(MX|ES)[\s-]?(\d{5,})$/i;
 const normCode = v => { const m = String(v || '').trim().match(codeRe); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+// Código tecleado: acepta "ES-4748635", "es 4748635" o solo "4748635" (sin MX/ES). Solo el número queda tal cual
+// (plataforma por identificar) y el agente lo busca como MX-… en Bringgo y como ES-… en EasyShip.
+const bareRe = /^#?(\d{6,9})$/;
+const parseCode = v => { const s = String(v || '').trim(); const m = s.match(bareRe); return normCode(s) || (m ? m[1] : null); };
+const isBare = c => /^\d+$/.test(String(c || ''));
+const platOf = c => (/^(MX|ES)-/.test(String(c || '')) ? c.slice(0, 2) : null);
+// Variantes que identifican el mismo paquete: 4748635 ↔ MX-4748635 / ES-4748635.
+const codeKeys = c => { if (!c) return []; if (isBare(c)) return [c, 'MX-' + c, 'ES-' + c]; return [c, c.slice(3)]; };
 const folio = id => 'INC-' + String(id).padStart(4, '0');
 const isOpenSql = `status NOT IN (${CLOSED.map(s => `'${s}'`).join(',')})`;
 
@@ -64,7 +72,7 @@ function createIncident(db, user, body, now = Date.now()) {
   const nolabel = !!body.nolabel;
   let code = null, trk = null;
   if (!nolabel) {
-    if (body.code) { code = normCode(body.code); if (!code) fail(400, 'El código debe ser MX-0000000 o ES-000000.'); }
+    if (body.code) { code = parseCode(body.code); if (!code) fail(400, 'El código debe ser MX-0000000, ES-0000000 o solo el número (ej. 4748635).'); }
     if (body.trk) { trk = String(body.trk).replace(/\s+/g, '').slice(0, 60); if (trk.length < 6) fail(400, 'La guía es muy corta.'); }
     if (!code && !trk) fail(400, 'Escanea una guía o teclea el código MX/ES.');
   } else if (type !== 'sinetiqueta' && type !== 'otro') fail(400, 'Un paquete sin etiqueta solo puede ser "Sin etiqueta" u "Otro".');
@@ -72,14 +80,14 @@ function createIncident(db, user, body, now = Date.now()) {
   const desc = String(body.description || '').trim().slice(0, 300);
   if (type === 'otro' && !other) fail(400, 'Especifica el motivo.');
   if (nolabel && !desc) fail(400, 'Describe el producto (no tiene código).');
-  const plat = code ? code.slice(0, 2) : null;
+  const plat = platOf(code);
   const damaged = type === 'danado';
 
   return tx(db, () => {
     // Anti-duplicado: mismo motivo y mismo código o guía con ticket abierto → se agrega al expediente.
     if (!nolabel) {
-      const ex = db.prepare(`SELECT * FROM tickets WHERE type=? AND ${isOpenSql} AND ((? IS NOT NULL AND code=?) OR (? IS NOT NULL AND trk=?)) ORDER BY id LIMIT 1`)
-        .get(type, code, code, trk, trk);
+      const ex = db.prepare(`SELECT * FROM tickets WHERE type=? AND ${isOpenSql} AND (code IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND trk=?)) ORDER BY id LIMIT 1`)
+        .get(type, JSON.stringify(codeKeys(code)), trk, trk);
       if (ex) {
         event(db, ex.id, user, 'evento', `Evento adicional registrado${other ? ': ' + other : ''}${trk && trk !== ex.trk ? ' · guía ' + trk : ''}`, now);
         return { id: ex.id, folio: folio(ex.id), appended: true, status: ex.status };
@@ -193,6 +201,52 @@ function resolve(db, user, id, text, now = Date.now()) {
     event(db, id, user, 'resolucion', 'Resolvió: ' + r, now);
   });
 }
+// Resolución rápida desde la bandeja (un clic, sin texto). Si el ticket no tiene responsable, quien resuelve lo toma
+// en la misma transacción. No pisa a otro responsable salvo con permiso de transferir. Queda en el historial.
+const QUICK_TEXT = 'Resuelto desde la bandeja (resolución rápida)';
+function quickResolve(db, user, id, now = Date.now()) {
+  need(user, 'resolve');
+  return tx(db, () => {
+    const t = getOpen(db, id);
+    if (t.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.');
+    if (t.owner_id && t.owner_id !== user.id && !can(user, 'transfer')) {
+      const o = db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id);
+      fail(403, `Lo tiene ${o ? o.name : 'otra persona'}; solo el responsable puede resolverlo.`);
+    }
+    // Condicionado al estado leído: si alguien lo tomó o cerró un instante antes, no se resuelve.
+    const r = db.prepare(`UPDATE tickets SET status='Resuelto', owner_id=?, resolution=?, resolved_at=?, version=version+1
+      WHERE id=? AND version=? AND ${isOpenSql}`).run(t.owner_id || user.id, QUICK_TEXT, now, id, t.version);
+    if (!r.changes) fail(409, 'El ticket cambió hace un instante; vuelve a intentarlo.');
+    if (!t.owner_id) event(db, id, user, 'asignacion', 'Tomó el ticket', now);
+    else if (t.owner_id !== user.id) {
+      const o = db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id);
+      event(db, id, user, 'asignacion', `Resolvió un ticket de ${o ? o.name : 'otra persona'}`, now);
+    }
+    event(db, id, user, 'resolucion', 'Resolvió: ' + QUICK_TEXT, now);
+    return { id, folio: folio(id), status: 'Resuelto' };
+  });
+}
+// Quién resolvió: el último evento de resolución (no hay columna; se evita una migración).
+function resolverOf(db, id) {
+  const e = db.prepare("SELECT actor_id FROM ticket_events WHERE ticket_id=? AND kind='resolucion' ORDER BY created_at DESC, id DESC LIMIT 1").get(id);
+  return e ? e.actor_id : null;
+}
+// Reabrir un ticket resuelto (p. ej. "Resuelto" pulsado por error). Puede quien lo resolvió o quien tiene permiso de restaurar.
+// No borra nada: la resolución anterior queda en el historial.
+function reopen(db, user, id, now = Date.now()) {
+  needAdmin(user);
+  return tx(db, () => {
+    const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id);
+    if (!t) fail(404, 'No existe ese ticket.');
+    if (t.status !== 'Resuelto') fail(409, 'Solo se pueden reabrir tickets resueltos.');
+    if (resolverOf(db, id) !== user.id && !can(user, 'restore')) fail(403, 'Solo quien lo resolvió o alguien con permiso de restaurar puede reabrirlo.');
+    const st = t.waiting_dept ? 'Esperando respuesta' : t.owner_id ? 'En gestión' : 'Abierto';
+    const r = db.prepare("UPDATE tickets SET status=?, resolution=NULL, resolved_at=NULL, version=version+1 WHERE id=? AND version=? AND status='Resuelto'").run(st, id, t.version);
+    if (!r.changes) fail(409, 'El ticket cambió hace un instante; vuelve a intentarlo.');
+    event(db, id, user, 'resolucion', `Reabrió el ticket (resolución anterior: ${t.resolution || '—'})`, now);
+    return { id, folio: folio(id), status: st };
+  });
+}
 function disposeDone(db, user, id, evidenceId, now = Date.now()) {
   need(user, 'dispose');
   return tx(db, () => {
@@ -238,8 +292,8 @@ function research(db, user, id, value) {
   needAdmin(user);
   const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id); if (!t) fail(404, 'No existe ese ticket.');
   const v = String(value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.');
-  const c = normCode(v);
-  if (c) db.prepare('UPDATE tickets SET code=?, plat=? WHERE id=?').run(c, c.slice(0, 2), id);
+  const c = parseCode(v);
+  if (c) db.prepare('UPDATE tickets SET code=?, plat=? WHERE id=?').run(c, platOf(c), id);
   else db.prepare('UPDATE tickets SET trk=? WHERE id=?').run(v.replace(/\s+/g, '').slice(0, 60), id);
   event(db, id, user, 'agente', 'Pidió nueva búsqueda con ' + v);
   enqueue(db, db.prepare('SELECT * FROM tickets WHERE id=?').get(id));
@@ -310,6 +364,7 @@ function runDeadlines(db, now = Date.now()) {
   return changes;
 }
 
-module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, folio, isOpenSql,
+module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, parseCode, isBare, platOf, codeKeys, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
-  confirmDup, resolve, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines, PROFILES, normName, findByName, createUser, setUserActive, H, D };
+  confirmDup, resolve, quickResolve, QUICK_TEXT, reopen, resolverOf, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines,
+  PROFILES, normName, findByName, createUser, setUserActive, H, D };

@@ -6,7 +6,7 @@
   'use strict';
   const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v5', PIN = '1234';
   const TYPES = { inbound: 'Guía no reconocida', producto: 'Sin producto o diferente', danado: 'Dañado o con escurrimiento', extradept: 'Extra Dept', sinetiqueta: 'Sin etiqueta', nouse: 'No use label', duplicado: 'Duplicado', otro: 'Otro' };
-  const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
+  const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada / reabrir resueltos de otros', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
   const DEPTS = ['Bringgo', 'EasyShip', 'Equipo turco', 'Vendedor Amazon', 'Murat (Laredo)', 'Customer Service', 'Procesamiento'];
   const TAGS = ['Mensaje', 'Instrucción del equipo turco', 'Instrucción del vendedor Amazon', 'Seguimiento'];
   const OUTCOMES = ['Pendiente', 'Regresó', 'Dispose de paquetería', 'Entregado'];
@@ -25,6 +25,7 @@
     'MX-2900440': { source: 'Bringgo · Accept goods', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['Product Name', 'EVER ADVANCED Rolling Ball Storage Cart'], ['W.T No', 'MX-2900440'], ['ASIN', 'B0BPYBDTC6'], ['Quantity', '1']] },
     '191255213580': { source: 'Bringgo · Item Look Up · Outbound Tracking Number', code: 'MX-2900440', product: 'EVER ADVANCED Rolling Ball Storage Cart', fields: [['W.H CODE', 'MX-2900440'], ['PRODUCT NAME', 'EVER ADVANCED Rolling Ball Storage Cart'], ['ASIN', 'B0BPYBDTC6'], ['SELLER ACCOUNT ORDER NO', '701-9461183-8702647'], ['OUTBOUND TRACKING', '191255213580 | Delivered']] },
     'MX-3015532': { source: 'Bringgo · Accept goods', code: 'MX-3015532', product: 'Hydro Flask 32 oz Wide Mouth', fields: [['Product Name', 'Hydro Flask 32 oz Wide Mouth'], ['W.T No', 'MX-3015532'], ['ASIN', 'B083GBK6S2'], ['Quantity', '1'], ['Destino · City', 'Querétaro']] },
+    'ES-4748635': { source: 'EasyShip · Orden', code: 'ES-4748635', product: null, fields: [['Orden EasyShip', '#4748635 · PRE_LABEL_CREATED'], ['Usuario', '#15589'], ['Paquetería', 'PAQUETEXPRESS > STANDARD'], ['Peso', '0.60 lbs']] },
     'ES-118412': { source: 'EasyShip · Item lookup', code: 'ES-118412', product: 'Olaplex No. 3 Hair Perfector 100 ml', fields: [['Orden EasyShip', '#4442683 · Delivered'], ['Producto', 'Olaplex No. 3 Hair Perfector 100 ml'], ['ASIN', 'B00SNM5US4'], ['Tracking ID', '8055420177'], ['Seller Order', '701-6636277-7159417'], ['Buyer Order', '114-7881374-5366648']] },
   };
 
@@ -37,6 +38,10 @@
   const now = () => Date.now();
   const folio = id => 'INC-' + String(id).padStart(4, '0');
   const normCode = v => { const m = String(v || '').trim().match(/^(MX|ES)[\s-]?(\d{5,})$/i); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+  const parseCode = v => { const s = String(v || '').trim(); const m = s.match(/^#?(\d{6,9})$/); return normCode(s) || (m ? m[1] : null); };
+  const isBare = c => /^\d+$/.test(String(c || ''));
+  const platOf = c => (/^(MX|ES)-/.test(String(c || '')) ? c.slice(0, 2) : null);
+  const codeKeys = c => !c ? [] : isBare(c) ? [c, 'MX-' + c, 'ES-' + c] : [c, c.slice(3)];
   const isOpen = t => !CLOSED.includes(t.status);
   class E extends Error { constructor(s, m) { super(m); this.status = s; } }
   const fail = (s, m) => { throw new E(s, m); };
@@ -71,7 +76,7 @@
   const can = (u, p) => u.role === 'admin' && u.perms.includes(p);
   const need = (u, p) => { if (!can(u, p)) fail(403, `Tu usuario no tiene permiso para: ${PERMS[p]}.`); };
   const needAdmin = u => { if (u.role !== 'admin') fail(403, 'Solo Victor y Customer Service pueden ver tickets.'); };
-  const event = (t, u, kind, text, at = now()) => DB.events.push({ id: ++DB.ev, ticket_id: t.id, who: u ? u.name : 'Proceso programado', kind, text, created_at: at });
+  const event = (t, u, kind, text, at = now()) => DB.events.push({ id: ++DB.ev, ticket_id: t.id, who: u ? u.name : 'Proceso programado', actor_id: u ? u.id : null, kind, text, created_at: at });
   const openT = id => { const t = tk(id); if (CLOSED.includes(t.status)) fail(409, `El ticket está ${t.status.toLowerCase()}.`); return t; };
   const manage = (u, t) => { if (t.owner_id !== u.id && !can(u, 'transfer')) fail(403, 'Solo el responsable o alguien con permiso de transferir puede hacer esto.'); };
   function enqueue(t, at = now()) {
@@ -83,7 +88,7 @@
     const type = String(b.type || ''); if (!TYPES[type]) fail(400, 'Elige un motivo válido.');
     const nolabel = !!b.nolabel; let code = null, trk = null;
     if (!nolabel) {
-      if (b.code) { code = normCode(b.code); if (!code) fail(400, 'El código debe ser MX-0000000 o ES-000000.'); }
+      if (b.code) { code = parseCode(b.code); if (!code) fail(400, 'El código debe ser MX-0000000, ES-0000000 o solo el número (ej. 4748635).'); }
       if (b.trk) { trk = String(b.trk).replace(/\s+/g, '').slice(0, 60); if (trk.length < 6) fail(400, 'La guía es muy corta.'); }
       if (!code && !trk) fail(400, 'Escanea una guía o teclea el código MX/ES.');
     } else if (type !== 'sinetiqueta' && type !== 'otro') fail(400, 'Un paquete sin etiqueta solo puede ser "Sin etiqueta" u "Otro".');
@@ -91,11 +96,11 @@
     if (type === 'otro' && !other) fail(400, 'Especifica el motivo.');
     if (nolabel && !desc) fail(400, 'Describe el producto (no tiene código).');
     if (!nolabel) {
-      const ex = DB.tickets.find(t => isOpen(t) && t.type === type && ((code && t.code === code) || (trk && t.trk === trk)));
+      const ex = DB.tickets.find(t => isOpen(t) && t.type === type && ((code && codeKeys(code).includes(t.code)) || (trk && t.trk === trk)));
       if (ex) { event(ex, u, 'evento', 'Evento adicional registrado' + (other ? ': ' + other : ''), at); return { id: ex.id, folio: folio(ex.id), appended: true, status: ex.status }; }
     }
     const dmg = type === 'danado';
-    const t = { id: ++DB.seq, code, trk, plat: code ? code.slice(0, 2) : null, nolabel, type, other_text: other || null, description: desc || null,
+    const t = { id: ++DB.seq, code, trk, plat: platOf(code), nolabel, type, other_text: other || null, description: desc || null,
       status: dmg ? 'Enviado dañado' : 'Abierto', reporter_id: u.id, reporter_dept: u.role === 'admin' ? u.dept : 'Operación', owner_id: null,
       waiting_dept: null, location: dmg ? 'Enviado con paquetería' : 'Mesa de incidencias', created_at: at, due_at: at + 3 * D, damage_outcome: dmg ? 'Pendiente' : null, enr_status: 'na' };
     DB.tickets.push(t);
@@ -134,9 +139,9 @@
     DB.hb = now();
     for (const j of DB.jobs) {
       if (j.status !== 'pending' || j.ready > now()) continue;
-      const t = tk(j.ticket_id), r = FAKE[j.code] || FAKE[j.trk];
-      if (r) { Object.assign(t, { enr_status: 'lista', enr_source: r.source, enr_data: { product: r.product, fields: r.fields, candidates: [] }, enr_at: j.ready }); if (!t.code) { t.code = r.code; t.plat = r.code.slice(0, 2); } event(t, null, 'agente', 'Agente de búsqueda: información obtenida de ' + r.source, j.ready); }
-      else { const tried = j.code ? [j.code.startsWith('MX') ? 'Bringgo · Accept goods' : 'EasyShip · Item lookup'] : ['Bringgo · Item Look Up', 'EasyShip · Item lookup'];
+      const t = tk(j.ticket_id), r = isBare(j.code) ? (FAKE['MX-' + j.code] || FAKE['ES-' + j.code]) : (FAKE[j.code] || FAKE[j.trk]);
+      if (r) { Object.assign(t, { enr_status: 'lista', enr_source: r.source, enr_data: { product: r.product, fields: r.fields, candidates: [] }, enr_at: j.ready }); if (!t.code || isBare(t.code)) { if (isBare(t.code)) event(t, null, 'agente', `Agente de búsqueda: el número ${t.code} es ${r.code}`, j.ready); t.code = r.code; t.plat = r.code.slice(0, 2); } event(t, null, 'agente', 'Agente de búsqueda: información obtenida de ' + r.source, j.ready); }
+      else { const tried = isBare(j.code) ? ['Bringgo · Accept goods (MX-' + j.code + ')', 'EasyShip · Orden (ES-' + j.code + ')'] : j.code ? [j.code.startsWith('MX') ? 'Bringgo · Accept goods' : 'EasyShip · Orden'] : ['Bringgo · Item Look Up', 'EasyShip · Item lookup'];
         Object.assign(t, { enr_status: 'sin', enr_source: null, enr_data: { tried }, enr_at: j.ready }); event(t, null, 'agente', 'Agente de búsqueda: sin coincidencias en ' + tried.join(', '), j.ready); }
       DB.events[DB.events.length - 1].who = 'Agente de búsqueda'; j.status = 'done';
     }
@@ -150,12 +155,13 @@
     }
     DB.last_job = { at: n, changes: c };
   }
+  const resolverOf = id => { const e = DB.events.filter(x => x.ticket_id === id && x.kind === 'resolucion').sort((a, b) => b.created_at - a.created_at || b.id - a.id)[0]; return e ? e.actor_id || null : null; };
   function row(t) {
     const N = id => id ? user(id).name : null;
     return { id: t.id, folio: folio(t.id), code: t.code, trk: t.trk, plat: t.plat, nolabel: !!t.nolabel, type: t.type, type_label: TYPES[t.type], other_text: t.other_text, description: t.description,
       status: t.status, open: isOpen(t), reporter: N(t.reporter_id), reporter_dept: t.reporter_dept, owner: N(t.owner_id), owner_id: t.owner_id, waiting_dept: t.waiting_dept, location: t.location,
       created_at: t.created_at, due_at: t.dup_due_at || t.due_at, late: !!t.late_flagged_at, dup_confirmed_by: N(t.dup_confirmed_by), dup_confirmed_at: t.dup_confirmed_at || null, dup_due_at: t.dup_due_at || null,
-      resolution: t.resolution || null, discarded_by: N(t.discarded_by), discarded_at: t.discarded_at || null, discard_reason: t.discard_reason || null, damage_outcome: t.damage_outcome,
+      resolution: t.resolution || null, resolved_by_id: t.status === 'Resuelto' ? resolverOf(t.id) : null, discarded_by: N(t.discarded_by), discarded_at: t.discarded_at || null, discard_reason: t.discard_reason || null, damage_outcome: t.damage_outcome,
       enr_status: t.enr_status, enr_source: t.enr_source || null, enr_data: t.enr_data || null, enr_at: t.enr_at || null };
   }
   const byDue = (a, b) => (isOpen(b) - isOpen(a)) || ((a.dup_due_at || a.due_at) - (b.dup_due_at || b.due_at));
@@ -175,7 +181,7 @@
     agent(); deadlines();
     if (p === '/api/me') return { ...me(u), types: TYPES, perms_catalog: PERMS, depts: DEPTS, tags: TAGS, outcomes: OUTCOMES };
     if (p === '/api/incidents' && method === 'POST') return create(u, body);
-    if (p === '/api/incidents/check') { const c = normCode(q.code), tr = q.trk; return DB.tickets.filter(t => isOpen(t) && ((c && t.code === c) || (tr && t.trk === tr))).map(t => ({ folio: folio(t.id), type_label: TYPES[t.type], has_owner: !!t.owner_id })); }
+    if (p === '/api/incidents/check') { const c = parseCode(q.code), tr = q.trk; return DB.tickets.filter(t => isOpen(t) && ((c && codeKeys(c).includes(t.code)) || (tr && t.trk === tr))).map(t => ({ folio: folio(t.id), type_label: TYPES[t.type], has_owner: !!t.owner_id })); }
     if (p === '/api/my-reports') return DB.tickets.filter(t => t.reporter_id === u.id && t.status !== 'Descartado').sort((a, b) => b.id - a.id).map(t => { const r = row(t); return { folio: r.folio, code: r.code, trk: r.trk, type_label: r.type_label, created_at: r.created_at, owner: r.owner, status: r.status }; });
     if (p === '/api/agent-status') return { online: true, last_seen: DB.hb, note: 'Demo', queue: DB.jobs.filter(j => j.status === 'pending').length };
     if (p === '/api/sheets-status') return { configured: false, last_ok_at: null, last_error: null };
@@ -205,13 +211,20 @@
     m = p.match(/^\/api\/users\/(\d+)\/pin$/);
     if (m) { need(u, 'users'); return { name: user(Number(m[1])).name, pin: PIN + ' (en la demo no cambia)' }; }
     if (p === '/api/tickets') {
-      const n = now();
+      const n = now(), s = String(q.q || '').replace(/\s+/g, '');
+      if (s) {
+        if (s.length < 4) fail(400, 'Escribe al menos 4 caracteres del código o la guía.');
+        const c = parseCode(s), lo = s.toLowerCase(), keys = c ? codeKeys(c) : [];
+        return DB.tickets.filter(t => t.status !== 'Descartado' && (keys.includes(t.code) || (t.code && t.code.toLowerCase().includes(lo)) || (t.trk && (t.trk.toLowerCase().includes(lo) || (t.trk.length >= 8 && s.includes(t.trk))))))
+          .sort((a, b) => (isOpen(b) - isOpen(a)) || b.id - a.id).map(row);
+      }
       return DB.tickets.filter(t => t.status !== 'Descartado').filter(t => {
         if (q.status === 'abiertos' && !isOpen(t)) return false;
         if (q.status === 'sin' && (!isOpen(t) || t.owner_id)) return false;
         if (q.status === 'mios' && t.owner_id !== u.id) return false;
         if (q.status === 'espera' && t.status !== 'Esperando respuesta') return false;
         if (q.status === 'dispose' && t.status !== 'Dispose programado') return false;
+        if (q.status === 'resueltos' && t.status !== 'Resuelto') return false;
         if (q.status === 'cerrados' && isOpen(t)) return false;
         if (q.type && t.type !== q.type) return false;
         if (q.plat && t.plat !== q.plat) return false;
@@ -235,13 +248,22 @@
       case 'location': { const o = openT(id); manage(u, o); o.location = String(body.location || '').trim() || null; event(o, u, 'ubicacion', 'Ubicación física: ' + (o.location || 'sin registrar')); break; }
       case 'messages': { needAdmin(u); const b = String(body.body || '').trim(); if (!b && !body.photo) fail(400, 'Escribe un mensaje o adjunta una foto.'); const ev = body.photo ? addEvidence(u, t, body.photo, 'general', 'Envió una foto en el chat') : null; if (b) msg(u, id, b); save(); return { ok: true, evidence_id: ev }; }
       case 'confirm-dup': confirmDup(u, id); break;
+      case 'reopen': { needAdmin(u); if (t.status !== 'Resuelto') fail(409, 'Solo se pueden reabrir tickets resueltos.');
+        if (resolverOf(id) !== u.id && !can(u, 'restore')) fail(403, 'Solo quien lo resolvió o alguien con permiso de restaurar puede reabrirlo.');
+        const st = t.waiting_dept ? 'Esperando respuesta' : t.owner_id ? 'En gestión' : 'Abierto', prev = t.resolution;
+        Object.assign(t, { status: st, resolution: null, resolved_at: null }); event(t, u, 'resolucion', `Reabrió el ticket (resolución anterior: ${prev || '—'})`); save(); return { id, folio: folio(id), status: st }; }
+      case 'quick-resolve': { need(u, 'resolve'); const o = openT(id); if (o.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.');
+        if (o.owner_id && o.owner_id !== u.id && !can(u, 'transfer')) fail(403, `Lo tiene ${user(o.owner_id).name}; solo el responsable puede resolverlo.`);
+        const QT = 'Resuelto desde la bandeja (resolución rápida)', prev = o.owner_id;
+        if (!prev) { o.owner_id = u.id; event(o, u, 'asignacion', 'Tomó el ticket'); } else if (prev !== u.id) event(o, u, 'asignacion', `Resolvió un ticket de ${user(prev).name}`);
+        Object.assign(o, { status: 'Resuelto', resolution: QT, resolved_at: now() }); event(o, u, 'resolucion', 'Resolvió: ' + QT); save(); return { id, folio: folio(id), status: 'Resuelto' }; }
       case 'resolve': { need(u, 'resolve'); const o = openT(id); if (o.owner_id !== u.id) fail(403, 'Toma el ticket para resolverlo.'); if (o.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.'); const r = String(body.resolution || '').trim(); if (r.length < 8) fail(400, 'Escribe la resolución final (qué se hizo y dónde quedó el paquete).'); Object.assign(o, { status: 'Resuelto', resolution: r, resolved_at: now() }); event(o, u, 'resolucion', 'Resolvió: ' + r); break; }
       case 'evidence': { needAdmin(u); const eid = addEvidence(u, t, { name: body.name, data: body.data }, body.purpose, body.purpose === 'dispose' ? 'Subió evidencia de disposición' : 'Agregó evidencia'); save(); return { id: eid }; }
       case 'dispose-done': { need(u, 'dispose'); if (t.status !== 'Dispose programado') fail(409, 'El ticket no está en Dispose programado.'); const e = DB.evidence.find(x => x.id === Number(body.evidence_id) && x.ticket_id === id && x.created_at >= t.dispose_scheduled_at); if (!e) fail(400, 'Sube la evidencia de la disposición antes de confirmarla.'); Object.assign(t, { status: 'Dispose realizado', dispose_done_at: now() }); event(t, u, 'dispose', 'Confirmó Dispose realizado con evidencia: ' + e.file_name); break; }
       case 'discard': { need(u, 'discard'); if (body.confirm !== true) fail(400, 'Falta la segunda confirmación.'); const r = String(body.reason || '').trim(); if (r.length < 10) fail(400, 'La justificación es obligatoria (mínimo 10 caracteres).'); if (t.status === 'Descartado') fail(409, 'Ya está descartado.'); Object.assign(t, { status_before_discard: t.status, status: 'Descartado', discarded_by: u.id, discarded_at: now(), discard_reason: r }); event(t, u, 'descarte', 'Descartó la incidencia: ' + r); break; }
       case 'restore': { need(u, 'restore'); if (t.status !== 'Descartado') fail(409, 'El ticket no está descartado.'); t.status = t.status_before_discard || 'Abierto'; event(t, u, 'descarte', 'Restauró la incidencia descartada'); break; }
       case 'damage-outcome': { needAdmin(u); if (!OUTCOMES.includes(body.outcome)) fail(400, 'Desenlace no válido.'); if (t.type !== 'danado') fail(404, 'No es un envío dañado.'); t.damage_outcome = body.outcome; event(t, u, 'danado', 'Desenlace del envío dañado: ' + body.outcome); break; }
-      case 'research': { needAdmin(u); const v = String(body.value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.'); const c = normCode(v); if (c) { t.code = c; t.plat = c.slice(0, 2); } else t.trk = v.replace(/\s+/g, ''); event(t, u, 'agente', 'Pidió nueva búsqueda con ' + v); enqueue(t); break; }
+      case 'research': { needAdmin(u); const v = String(body.value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.'); const c = parseCode(v); if (c) { t.code = c; t.plat = platOf(c); } else t.trk = v.replace(/\s+/g, ''); event(t, u, 'agente', 'Pidió nueva búsqueda con ' + v); enqueue(t); break; }
       default: fail(404, 'No existe.');
     }
     return { ok: true };

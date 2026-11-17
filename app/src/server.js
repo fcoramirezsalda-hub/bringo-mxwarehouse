@@ -52,7 +52,9 @@ function createApp(db, opts = {}) {
 
   const me = u => ({ id: u.id, name: u.name, role: u.role, dept: u.dept, title: u.title, perms: dm.permsOf(u) });
   app.use('/api', auth);
-  app.get('/api/me', wrap(req => ({ ...me(req.user), types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
+  const returns = require('./returns').mountReturns(app, db, opts, now);
+  const rscan = require('./retornos-escaneo').mount(app, db, opts, now);
+  app.get('/api/me', wrap(req => ({ ...me(req.user), returns_mode: returns.mode, returns_scan: rscan.enabled, types: dm.TYPES, perms_catalog: dm.PERMS, depts: dm.DEPTS, tags: dm.MSG_TAGS, outcomes: dm.DAMAGE_OUTCOMES })));
 
   // ---------- Serialización ----------
   const names = () => Object.fromEntries(db.prepare('SELECT id, name FROM users').all().map(u => [u.id, u.name]));
@@ -65,15 +67,16 @@ function createApp(db, opts = {}) {
       dup_confirmed_by: t.dup_confirmed_by ? N[t.dup_confirmed_by] : null, dup_confirmed_at: t.dup_confirmed_at, dup_due_at: t.dup_due_at,
       resolution: t.resolution, resolved_at: t.resolved_at, discarded_by: t.discarded_by ? N[t.discarded_by] : null, discarded_at: t.discarded_at,
       discard_reason: t.discard_reason, dispose_scheduled_at: t.dispose_scheduled_at, dispose_done_at: t.dispose_done_at,
+      resolved_by_id: t.status === 'Resuelto' ? dm.resolverOf(db, t.id) : null,
       damage_outcome: t.damage_outcome, enr_status: t.enr_status, enr_source: t.enr_source, enr_data: t.enr_data ? JSON.parse(t.enr_data) : null, enr_at: t.enr_at, version: t.version };
   }
 
   // ---------- Registro (operadores y admins) ----------
   app.post('/api/incidents', wrap(req => dm.createIncident(db, req.user, req.body, now())));
   app.get('/api/incidents/check', wrap(req => {
-    const code = dm.normCode(req.query.code), trk = req.query.trk ? String(req.query.trk).replace(/\s+/g, '') : null;
+    const code = dm.parseCode(req.query.code), trk = req.query.trk ? String(req.query.trk).replace(/\s+/g, '') : null;
     if (!code && !trk) return [];
-    return db.prepare(`SELECT id, type, owner_id FROM tickets WHERE ${dm.isOpenSql} AND ((? IS NOT NULL AND code=?) OR (? IS NOT NULL AND trk=?))`).all(code, code, trk, trk)
+    return db.prepare(`SELECT id, type, owner_id FROM tickets WHERE ${dm.isOpenSql} AND (code IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND trk=?))`).all(JSON.stringify(dm.codeKeys(code)), trk, trk)
       .map(t => ({ folio: dm.folio(t.id), type_label: dm.TYPES[t.type], has_owner: !!t.owner_id }));
   }));
   app.get('/api/my-reports', wrap(req => {
@@ -86,11 +89,22 @@ function createApp(db, opts = {}) {
   app.get('/api/tickets', wrap(req => {
     dm.needAdmin(req.user);
     const q = req.query, w = ["status<>'Descartado'"], p = [];
+    // Búsqueda por código MX/ES (con o sin prefijo) o guía. Busca en todos los estados: ignora los filtros.
+    const s = String(q.q || '').trim().replace(/\s+/g, '').slice(0, 80);
+    if (s) {
+      if (s.length < 4) dm.fail(400, 'Escribe al menos 4 caracteres del código o la guía.');
+      const code = dm.parseCode(s), like = '%' + s.replace(/[\\%_]/g, c => '\\' + c) + '%';
+      w.push(`(code IN (SELECT value FROM json_each(?)) OR code LIKE ? ESCAPE '\\' OR trk LIKE ? ESCAPE '\\' OR (length(trk)>=8 AND instr(?, trk)>0))`);
+      p.push(JSON.stringify(code ? dm.codeKeys(code) : []), like, like, s);
+      const N = names();
+      return db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, id DESC LIMIT 100`).all(...p).map(t => row(t, N));
+    }
     if (q.status === 'abiertos') w.push(dm.isOpenSql);
     else if (q.status === 'sin') w.push(dm.isOpenSql, 'owner_id IS NULL');
     else if (q.status === 'mios') { w.push('owner_id=?'); p.push(req.user.id); }
     else if (q.status === 'espera') w.push("status='Esperando respuesta'");
     else if (q.status === 'dispose') w.push("status='Dispose programado'");
+    else if (q.status === 'resueltos') w.push("status='Resuelto'");
     else if (q.status === 'cerrados') w.push('NOT ' + dm.isOpenSql);
     if (q.type && dm.TYPES[q.type]) { w.push('type=?'); p.push(q.type); }
     if (q.plat === 'MX' || q.plat === 'ES') { w.push('plat=?'); p.push(q.plat); }
@@ -119,6 +133,8 @@ function createApp(db, opts = {}) {
   act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location));
   act('confirm-dup', (req, id) => dm.confirmDup(db, req.user, id, now()));
   act('resolve', (req, id) => dm.resolve(db, req.user, id, req.body.resolution, now()));
+  app.post('/api/tickets/:id/reopen', wrap(req => dm.reopen(db, req.user, Number(req.params.id), now())));
+  app.post('/api/tickets/:id/quick-resolve', wrap(req => dm.quickResolve(db, req.user, Number(req.params.id), now())));
   act('dispose-done', (req, id) => dm.disposeDone(db, req.user, id, Number(req.body.evidence_id), now()));
   act('discard', (req, id) => dm.discard(db, req.user, id, req.body.reason, req.body.confirm === true, now()));
   act('restore', (req, id) => dm.restore(db, req.user, id));
@@ -215,13 +231,22 @@ if (require.main === module) {
   if (!db.prepare('SELECT COUNT(*) n FROM users').get().n) { console.error('No hay usuarios. Corre primero: npm run setup'); process.exit(1); }
   const app = createApp(db);
   const port = Number(process.env.PORT || 8080);
-  setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
-  dm.runDeadlines(db);
-  require('./sheets-sync').start(db);
-  app.listen(port, '0.0.0.0', () => {
+  const server = app.listen(port, '0.0.0.0', () => {
+    // Los procesos de fondo arrancan solo si este servidor quedó escuchando (evita dos copias trabajando a la vez).
+    setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
+    dm.runDeadlines(db);
+    require('./sheets-sync').start(db);
+    if (require('./retornos-escaneo').enabled()) require('./retornos-escaneo').start(db);
     const ips = Object.values(require('os').networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
     console.log(`MX Wharehouse · incidencias en http://localhost:${port}`);
     ips.forEach(ip => console.log(`  En la red de la bodega: http://${ip}:${port}`));
+  });
+  server.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`\nYa hay un servidor de MX Wharehouse (u otro programa) usando el puerto ${port}.`);
+      console.error('Si acabas de cambiar la configuración, detén el anterior:  netstat -ano | findstr :' + port + '   y luego   taskkill /PID <número> /F');
+    } else console.error('No se pudo iniciar el servidor: ' + e.message);
+    process.exit(1);
   });
 }
 

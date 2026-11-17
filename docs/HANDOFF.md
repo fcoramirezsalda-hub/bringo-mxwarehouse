@@ -1,5 +1,14 @@
 # Handoff
 
+## 2026-11-17 (9) · Claude Code · integración a main (v0.7.0)
+
+- Se unió la rama de usuarios (alta/baja, Janneth, Isaac) con main v0.6.1 (escaneo de retornos, búsqueda en bandeja, reabrir). Versión 0.7.0.
+- Conflictos resueltos conservando ambos lados: exports de `domain.js`, tecla Enter en `app.js`, pruebas, DECISIONS (la bitácora de usuarios pasó a pendiente 12) y este archivo.
+- **Pruebas:** `npm test` 34/34. En navegador: Francisco R. ve "Agregar persona"; Janneth ve la bandeja; Isaac ve Registrar, Mis reportes y,
+  con `RETURNS_SCAN=on`, "Escanear retorno". Sin errores.
+- En la PC principal: `git pull` en main, `cd app`, `npm install`, `npm run setup` (crea a Janneth e Isaac y muestra sus PINs), reiniciar el servidor.
+  El escaneo de retornos se activa con `npm run retornos:setup` (ver `app/LEEME.md`).
+
 ## 2026-11-17 (8) · Claude Code · Janneth (CS) e Isaac (Operación)
 
 - Equipo base (`app/src/setup.js` y demo): **Janneth** en Customer Service (tomar, resolver, confirmar duplicado) e **Isaac** como operador de **Operación** (antes estaba en Retornos).
@@ -17,7 +26,7 @@
 
 **Pruebas:** `npm test` 13/13; demo en navegador: Isaac en la lista de inicio, alta de "Luis" muestra PIN, sin errores.
 
-**Sigue pendiente de la revisión:** escaneo de retornos (no existe; bloqueado por pendiente 9 de DECISIONS), bitácora de altas/bajas (pendiente 11),
+**Sigue pendiente de la revisión:** escaneo de retornos (no existe; bloqueado por pendiente 9 de DECISIONS), bitácora de altas/bajas (pendiente 12),
 área de Josue/Adrian en la base de la bodega, transacción en `setup`, perfiles duplicados en setup/demo.
 
 ## 2026-11-17 (6) · Claude Code · alta/baja de usuarios y equipo de retornos (v0.4.0)
@@ -34,7 +43,90 @@
 **Pruebas:** `npm test` 13/13 (3 nuevas: retornos registra pero no ve tickets; alta/baja/reactivación con permisos y liberación de tickets; setup agrega solo a quien falta).
 En navegador (servidor real): alta de "Luis" con perfil retornos muestra PIN, baja con confirmación, fila "Dado de baja" con "Reactivar", 400 px sin scroll horizontal, sin errores de la página.
 
-**Falta:** volver a publicar la demo en el link del panel; correr `npm run setup` (o agregar a Isaac desde la pantalla) en la PC de la bodega; decidir la bitácora de altas/bajas (DECISIONS pendiente 11).
+**Falta:** volver a publicar la demo en el link del panel; correr `npm run setup` (o agregar a Isaac desde la pantalla) en la PC de la bodega; decidir la bitácora de altas/bajas (DECISIONS pendiente 12).
+## 2026-11-17 (11) · Claude Code · reabrir tickets resueltos (v0.6.1)
+
+- El propietario eligió "Reabrir" (en lugar de "Deshacer") para corregir un "Resuelto" pulsado por error.
+- `POST /api/tickets/:id/reopen` (`domain.reopen`): solo tickets en estado Resuelto (no Dispose realizado, Enviado dañado ni Descartado).
+  Puede quien lo resolvió (último evento `resolucion`, sin columna nueva) o quien tiene el permiso `restore` (Victor, Francisco R.).
+  Vuelve a En gestión / Esperando respuesta / Abierto según responsable y espera; borra `resolution` y `resolved_at` del ticket, pero
+  la resolución anterior queda en el evento "Reabrió el ticket (resolución anterior: …)". Condicionado a `version`.
+- Botón "Reabrir" en la fila de la bandeja (donde estaba "Resuelto"), en el aviso que sale al resolver y en el banner de resolución del detalle.
+- El permiso `restore` ahora dice "Restaurar descartada / reabrir resueltos de otros". Sin migración.
+- Arreglo menor: `route()` ya no falla si cambia el `#` de la dirección en la pantalla de inicio de sesión.
+- Pruebas: `npm test` 30/30 (nueva: reabrir con permisos e historial). Navegador: resolver → Reabrir desde el aviso → En gestión;
+  Reabrir en fila y detalle; Pamela no ve Reabrir en un ticket que resolvió Samantha; sin errores de consola.
+- Demo regenerada y publicada en el link permanente (versión 21 del artifact).
+
+## 2026-11-17 (10) · Claude Code · bandeja: buscador, filtros reducidos y resolución rápida (v0.6.0)
+
+- Pedido del propietario. Sin migración ni dependencias nuevas.
+- **Filtros:** la bandeja solo muestra Estado y Responsable. Se agregó el estado "Resueltos" (`status=resueltos`). La API sigue aceptando los filtros anteriores.
+- **Buscador** (lo más usado): campo grande con el foco al entrar (en PC) para escanear o teclear y Enter. `GET /api/tickets?q=` busca por
+  código con o sin prefijo (`4748635` = `MX-`/`ES-4748635`), parte del código o de la guía, y por código de barras largo que contiene la guía.
+  Busca en todos los estados (menos Descartado) e ignora los filtros, con aviso en pantalla. Mínimo 4 caracteres; comodines `%`/`_` escapados.
+- **Botón "Resuelto" en la fila**, sin ventana adicional: `POST /api/tickets/:id/quick-resolve` (`domain.quickResolve`). Requiere permiso
+  `resolve` (CS y Victor). Si no tiene responsable, lo toma en la misma transacción; si lo tiene otra persona, solo con permiso `transfer`
+  (Victor, Francisco R.) y queda el evento. Resolución fija "Resuelto desde la bandeja (resolución rápida)". Condicionado a `version` para no pisar
+  un cambio simultáneo (409). No aplica a Dispose programado. El clic no abre el ticket; tras resolver, el foco vuelve al buscador.
+- En móvil la columna del botón queda fija a la derecha de la tabla.
+- Demo (`demo/mock-api.js`) con las mismas reglas; `demo/dist` regenerado (falta volver a publicarlo en el link de la demo).
+- Pruebas: `npm test` 29/29 (2 nuevas: búsqueda y resolución rápida con permisos). Navegador (Chromium, servidor real): Samantha ve 3 campos,
+  foco en el buscador, `4791234` + Enter → 1 resultado, "Resuelto" → aparece en Resueltos; operador no ve botones; 390 px sin desborde.
+- Pendiente: el propietario confirma los detalles de DECISIONS (pendiente 12), sobre todo si hace falta "Deshacer".
+
+## 2026-11-17 (9) · Claude Code · servidor: puerto ocupado sin trabajos de fondo duplicados (v0.5.2)
+
+- En la PC de la bodega, tras `npm run retornos:setup`, el servidor viejo seguía en el puerto 8080 y el nuevo fallaba en bucle (EADDRINUSE).
+- Antes, plazos, copia a Sheets y copia de retornos arrancaban **antes** de `listen`; ahora solo cuando el servidor quedó escuchando.
+- Con el puerto ocupado muestra un mensaje claro (netstat / taskkill) y sale, en vez del error técnico.
+- Pruebas: `npm test` 27/27; simulado con dos servidores en el mismo puerto: el segundo sale sin arrancar nada.
+
+## 2026-11-17 (9) · Claude Code · MX/ES sin prefijo y orden de EasyShip (v0.5.1)
+
+- Pedido del propietario: poder teclear `4748635` en lugar de `ES-4748635`.
+- En "Teclea el código MX o ES" ahora vale el número solo (6–9 dígitos, también `#4748635`). Queda como "Por identificar"
+  y el agente lo busca como `MX-…` en Bringgo y como `ES-…` en EasyShip; al encontrarlo completa el código y la plataforma
+  y deja un evento ("el número 4748635 es ES-4748635"). Si aparece en las dos, muestra ambas como candidatos y no elige.
+- Un número **escaneado** en el campo de guía se sigue tratando como guía (las guías también son numéricas).
+- Anti-duplicado y aviso de "ya hay ticket abierto": `4748635`, `MX-4748635` y `ES-4748635` cuentan como el mismo paquete.
+- "Buscar de nuevo" (detalle del ticket) también acepta el número solo. Ojo: ahí un número de 6–9 dígitos se toma como código, no como guía.
+- Nuevo lector `easyOrder` en `connectors.js`: abre `https://warehouse.easyshipping.cloud/prepare-v2/<número>/` (pantalla de la captura del
+  propietario) y lee estado, usuario, paquetería, peso, orden Amazon y ASIN. Solo lectura. Si no abre, usa Item lookup como antes.
+- Sin migración: el número solo se guarda en `tickets.code` sin prefijo y `plat` NULL hasta que el agente lo identifica.
+- Demo (`demo/mock-api.js`) actualizada; dato de prueba `4748635` → ES-4748635.
+- Pruebas: `npm test` 27/27 (nueva: número solo, agrupación con ES-, completar prefijo, sin coincidencias conserva el número).
+  Navegador (demo, 420 px): teclear 4748635 muestra "Por identificar · Número tecleado" y el aviso de búsqueda; sin errores de consola.
+- **No probado:** `easyOrder` contra EasyShip real (no hay sesión desde aquí). Los textos que lee salen de la captura; revisar en la PC de la
+  bodega con `HEADLESS=false` y, si algo no se llena, mandar captura.
+
+## 2026-11-17 (8) · Claude Code · escaneo de retornos con detección, racks y copia a la hoja (v0.5.0)
+
+- Implementado ADR-002 (aprobado): menú "Escanear retorno", `guias.js`, `retornos-escaneo.js`, `Retornos.gs`. Ver el ADR para el detalle.
+- Tablas nuevas (solo se agregan): racks, rack_assign, return_scans, return_events, guide_refs, guide_rules, sheet_registro, returns_state.
+- Apagado por defecto: se activa con `npm run retornos:setup` (o `RETURNS_SCAN=on`). Sin hoja configurada guarda solo en la PC.
+- Pruebas: `npm test` 26/26. `Retornos.gs` se ejecuta contra una hoja simulada (no toca D/G/I, reintentos sin duplicar, respeta escaneos directos).
+  Navegador: operador y admin, Enter del lector, repetida, Por identificar → corrección, rack, asignación, anulación, móvil sin desbordes.
+  Datos reales: 328/328 coinciden con la hoja; con guías nuevas 83.5 % automático y 100 % de aciertos.
+- **No probado:** `Retornos.gs` en Google real (no hay acceso de escritura desde aquí). Probarlo primero en una **copia** de la hoja.
+- Pendiente: instalar en la PC de la bodega. Los racks no tienen código de barras (decisión del propietario): no se confirma el acomodo por escaneo.
+
+## 2026-11-17 (7) · Claude Code · propuesta de escaneo de retornos con detección y racks
+
+- Solo documentación: `docs/ADR-002-escaneo-retornos.md`. Sin cambios de código.
+- Se revisó en solo lectura el Apps Script "Escaneo Retornos — Eyoyo" y las pestañas Reglas, Catálogo, Referencia BrinGO y Modelo ML;
+  el algoritmo de detección queda documentado en el ADR para portarlo a Node.
+- Pendiente: respuestas del propietario (DECISIONS, pendiente 11) antes de crear tablas o escribir en la hoja.
+
+## 2026-11-17 (6) · Claude Code · retornos escaneados integrados (apagado por defecto)
+
+- Se integró el ZIP de prueba de Codex (`BrinGO-prueba-retornos-Claude.zip`, base 60aecc1), revisado y depurado. Detalle y opciones: `docs/ADR-001-retornos.md`.
+- Nuevo `app/src/returns.js` y menú "Retornos escaneados". Variable `RETURNS_MODE`: `off` (predeterminado), `demo`, `site`.
+  Con `off` la aplicación se comporta igual que v0.3.0. Sin cambios de esquema ni dependencias nuevas.
+- Abrir ticket desde un retorno crea un ticket "Otro" con la guía; si ya hay uno abierto, lo abre sin escribir nada.
+- Revisión de la hoja "Escaneo de Retornos" (solo lectura): la pestaña Registro no tiene rack ni estado; esos campos solo están en el Site.
+- Pruebas: `npm test` 15/15 (5 nuevas de retornos). Prueba en navegador (Chromium) con `off` y `demo`, como admin y operador: menú, búsqueda con Enter, abrir ticket; sin errores de consola.
+- Pendiente: el propietario elige la fuente real (recomendado: leer la hoja con cuenta de servicio de solo lectura). El modo `site` no se probó con datos reales.
 
 ## 2026-11-17 (5) · Claude Code · instalador arranca el sistema y lo comprueba
 

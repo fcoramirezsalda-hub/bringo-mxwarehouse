@@ -9,8 +9,10 @@ const H = 3600e3, D = 24 * H;
 const dur = ms => { ms = Math.abs(ms); const d = Math.floor(ms / D), h = Math.floor(ms % D / H), m = Math.floor(ms % H / 60e3); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 const codeRe = /^(MX|ES)[\s-]?(\d{5,})$/i;
 const normCode = v => { const m = String(v || '').trim().match(codeRe); return m ? `${m[1].toUpperCase()}-${m[2]}` : null; };
+// En el campo de código también vale solo el número (4748635): el agente averigua si es MX o ES.
+const parseCode = v => { const s = String(v || '').trim(); const m = s.match(/^#?(\d{6,9})$/); return normCode(s) || (m ? m[1] : null); };
 
-const S = { me: null, view: 'registro', sel: null, tab: 'chat', R: null, last: null, ui: {}, fl: { status: 'abiertos', type: '', owner: '', plat: '', due: '', enr: '' }, users: [], cache: {} };
+const S = { rs: { last: null, err: null, q: '', rows: [] }, me: null, view: 'registro', sel: null, tab: 'chat', R: null, last: null, ui: {}, fl: { status: 'abiertos', owner: '' }, q: '', users: [], cache: {} };
 
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
@@ -57,13 +59,15 @@ async function showLogin() {
 }
 
 /* ---------- Navegación ---------- */
-const TITLES = { registro: 'Registrar incidencia', misreportes: 'Mis reportes', tickets: 'Bandeja de tickets', tablero: 'Tablero', duplicados: 'Mercancías duplicadas', danados: 'Enviados dañados', descartes: 'Archivo de descartes', equipo: 'Equipo y permisos' };
-const ICONS = {
+const TITLES = { escaneo: 'Escanear retorno', retornos: 'Retornos escaneados', registro: 'Registrar incidencia', misreportes: 'Mis reportes', tickets: 'Bandeja de tickets', tablero: 'Tablero', duplicados: 'Mercancías duplicadas', danados: 'Enviados dañados', descartes: 'Archivo de descartes', equipo: 'Equipo y permisos' };
+const ICONS = { escaneo: '<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/>', retornos: '<path d="M4 6h16v14H4zM8 3v6M16 3v6M8 14h8"/>',
   registro: '<path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M12 8v5M12 16v.5"/>', misreportes: '<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/>',
   tickets: '<path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4zM10 6v12"/>', tablero: '<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>',
   duplicados: '<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V4H4v12h4"/>', danados: '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/>',
   descartes: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>', equipo: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>' };
-const navFor = () => isAdmin() ? [['grp', 'Gestión'], ['tickets'], ['tablero'], ['duplicados'], ['danados'], ['descartes'], ['grp', 'Piso'], ['registro'], ['grp', 'Personal'], ['equipo']] : [['grp', 'Mi estación'], ['registro'], ['misreportes']];
+const hasReturns = () => !!S.me && !!S.me.returns_mode && S.me.returns_mode !== 'off';
+const hasScan = () => !!S.me && S.me.returns_scan === true;
+const navFor = () => { const ret = hasReturns() ? [['retornos']] : [], sc = hasScan() ? [['escaneo']] : []; return isAdmin() ? [['grp', 'Gestión'], ['tickets'], ['tablero'], ['duplicados'], ['danados'], ['descartes'], ['grp', 'Piso'], ['registro'], ...sc, ...ret, ['grp', 'Personal'], ['equipo']] : [['grp', 'Mi estación'], ['registro'], ...sc, ['misreportes'], ...ret]; };
 function renderNav() {
   $('#nav').innerHTML = navFor().map(([k, l]) => k === 'grp' ? `<div class="grp lbl">${l}</div>` : `<a href="#${k}" class="${S.view === k ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${TITLES[k]}</a>`).join('');
   $('#crumb').innerHTML = `${isAdmin() ? 'Panel administrativo' : 'Operación'} › <b>${S.sel && S.view === 'tickets' ? 'Ticket' : TITLES[S.view]}</b>`;
@@ -76,9 +80,11 @@ async function render() {
   catch (e) { v.innerHTML = `<div class="banner bad"><span class="ic">!</span><div><b>No se pudo cargar</b>${esc(e.message)}</div></div>`; }
 }
 function after() {
+  if (S.view === 'tickets' && !S.sel) { const el = $('#tq'); if (el && matchMedia('(pointer:fine)').matches) { el.focus(); el.select(); } }
+  if (S.view === 'escaneo') { const el = $('#rscan'); if (el && !S.rs.keepFocus) el.focus(); S.rs.keepFocus = false; }
   if (S.view === 'registro') { const R = S.R; const el = R && R.focusCode ? $('#code') : (!R || R.step === 1) ? $('#scan') : (R.type === 'otro' ? $('#f-otro') : R.nolabel ? $('#f-desc') : null); if (el) el.focus(); if (R) R.focusCode = false; }
 }
-function route() { const h = location.hash.slice(1); const ok = navFor().map(x => x[0]); S.view = VIEWS[h] && ok.includes(h) ? h : (isAdmin() ? 'tickets' : 'registro'); S.sel = null; S.ui = {}; render(); scrollTo(0, 0); agentStatus(); }
+function route() { if (!S.me) return; const h = location.hash.slice(1); const ok = navFor().map(x => x[0]); S.view = VIEWS[h] && ok.includes(h) ? h : (isAdmin() ? 'tickets' : 'registro'); S.sel = null; S.ui = {}; render(); scrollTo(0, 0); agentStatus(); }
 addEventListener('hashchange', route);
 
 /* ---------- Registro ---------- */
@@ -86,9 +92,10 @@ function newR() { return { step: 1, f: {}, err: null }; }
 async function identify(raw, how) {
   const R = S.R || (S.R = newR()); const v = String(raw || '').trim(); R.err = null; S.last = null;
   if (!v) { R.err = how === 'code' ? 'Teclea el código MX o ES.' : 'Escanea o escribe la guía.'; return render(); }
-  const nc = normCode(v);
-  if (how === 'code' && !nc) { R.err = `“${v}” no tiene formato de código MX o ES (ej. MX-3015532).`; R.focusCode = true; return render(); }
-  Object.assign(R, nc ? { code: nc, plat: nc.slice(0, 2), trk: null, src: 'Código tecleado' } : { code: null, plat: null, trk: v.replace(/\s+/g, ''), src: 'Guía escaneada' }, { step: 2, type: null, f: {}, nolabel: false, existing: [] });
+  // Un número escaneado es una guía; en el campo de código, un número solo es un MX/ES sin prefijo.
+  const nc = how === 'code' ? parseCode(v) : normCode(v), bare = /^\d+$/.test(nc || '');
+  if (how === 'code' && !nc) { R.err = `“${v}” no tiene formato de código MX o ES (ej. MX-3015532 o solo 4748635).`; R.focusCode = true; return render(); }
+  Object.assign(R, nc ? { code: nc, plat: bare ? null : nc.slice(0, 2), trk: null, src: bare ? 'Número tecleado' : 'Código tecleado' } : { code: null, plat: null, trk: v.replace(/\s+/g, ''), src: 'Guía escaneada' }, { step: 2, type: null, f: {}, nolabel: false, existing: [] });
   try { R.existing = await api('GET', '/api/incidents/check?' + new URLSearchParams(R.code ? { code: R.code } : { trk: R.trk })); } catch {}
   render();
 }
@@ -110,12 +117,12 @@ function vRegistro() {
     ${s === 1 ? `<div class="field"><label class="lbl" for="scan">Escanea la guía</label>
       <div class="scanrow" style="margin-top:0"><input id="scan" class="scaninput" type="text" autocomplete="off" spellcheck="false" placeholder="ID…"><button class="btn brand" data-a="scan">Buscar</button></div></div>
       <div class="or">¿No escanea o el número no es válido?</div>
-      <div class="field"><label class="lbl" for="code">Teclea el código MX o ES con problema</label>
-      <div class="row"><input id="code" class="codeinput" type="text" autocomplete="off" spellcheck="false" placeholder="MX-0000000"><button class="btn brand" data-a="usecode">Usar código</button></div></div>
+      <div class="field"><label class="lbl" for="code">Teclea el código MX o ES con problema · con o sin “MX-”/“ES-”</label>
+      <div class="row"><input id="code" class="codeinput" type="text" autocomplete="off" spellcheck="false" placeholder="MX-0000000 o solo el número"><button class="btn brand" data-a="usecode">Usar código</button></div></div>
       ${R && R.err ? `<p class="err" role="alert">${esc(R.err)}</p>` : ''}
       <div class="row"><button class="btn ghost-danger" data-a="nolabel">El paquete no tiene etiqueta</button></div>`
     : `<div class="row"><span class="code">${esc(R.nolabel ? 'Sin etiqueta' : R.code || R.trk)}</span>${R.nolabel ? '' : platChip(R.plat)}<span class="chip neutral">${esc(R.src)}</span></div>
-      <p class="small muted">${R.nolabel ? 'Sin código: se identifica por descripción.' : 'La información de la orden la agrega el agente de búsqueda al ticket en unos minutos.'}</p>
+      <p class="small muted">${R.nolabel ? 'Sin código: se identifica por descripción.' : /^\d+$/.test(R.code || '') ? `Sin MX/ES: el agente lo busca como MX-${esc(R.code)} en Bringgo y como ES-${esc(R.code)} en EasyShip y completa el código.` : 'La información de la orden la agrega el agente de búsqueda al ticket en unos minutos.'}</p>
       ${R.existing && R.existing.length ? `<div class="banner warn"><span class="ic">!</span><div><b>Ya hay ${R.existing.length === 1 ? 'un ticket abierto' : R.existing.length + ' tickets abiertos'} para ${esc(R.code || R.trk)}</b>${R.existing.map(t => `${t.folio} · ${esc(t.type_label)}`).join('<br>')}<br>Si registras el mismo motivo, se agrega a ese expediente.</div></div>` : ''}`}
   </section>
   <section class="stepcard ${cls(2)}">
@@ -147,34 +154,36 @@ async function vMisReportes() {
 }
 
 /* ---------- Bandeja ---------- */
-function ticketTable(list, compact) {
-  return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th></tr></thead><tbody>
+// Resolución rápida: solo CS y Victor (permiso "resolver"); el servidor vuelve a validar todo.
+const canQuick = t => can('resolve') && t.open && t.status !== 'Dispose programado' && (!t.owner_id || t.owner_id === S.me.id || can('transfer'));
+const canReopen = t => t.status === 'Resuelto' && (can('restore') || (t.resolved_by_id && t.resolved_by_id === S.me.id));
+function ticketTable(list, compact, quick) {
+  return `<div class="tbl-wrap"><table><thead><tr><th>Folio</th><th>Código / guía</th><th>Motivo</th>${compact ? '' : '<th>Orden</th><th>Registró</th>'}<th>Responsable</th>${compact ? '' : '<th>Esperando a</th>'}<th>Plazo</th><th>Estado</th>${quick ? '<th><span class="sr">Acción</span></th>' : ''}</tr></thead><tbody>
   ${list.length ? list.map(t => { const d = dueInfo(t); return `<tr class="click ${d.k === 'late' ? 'late' : d.k === 'soon' ? 'soon' : ''}" data-a="open" data-v="${t.id}" tabindex="0">
     <td class="mono"><b>${t.folio}</b></td><td><span class="mono">${esc(idl(t))}</span> ${t.plat ? `<span class="chip ${t.plat === 'MX' ? 'mx' : 'es'}">${t.plat}</span>` : ''}</td><td>${esc(t.type_label)}${t.other_text ? `<div class="muted small">${esc(t.other_text)}</div>` : ''}</td>
     ${compact ? '' : `<td>${enrChip(t)}</td><td>${esc(t.reporter)}<div class="muted small">${fdt(t.created_at)}</div></td>`}
     <td>${t.owner ? esc(t.owner) : t.open ? '<span class="chip warn">Sin asignar</span>' : '<span class="muted">—</span>'}</td>${compact ? '' : `<td>${t.waiting_dept && t.open ? esc(t.waiting_dept) : '<span class="muted">—</span>'}</td>`}
-    <td>${d.html}</td><td>${stChip(t.status)}</td></tr>`; }).join('') : '<tr><td colspan="9" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
+    <td>${d.html}</td><td>${stChip(t.status)}</td>${quick ? `<td class="qcell">${canQuick(t) ? `<button class="btn sm done" data-a="qres" data-v="${t.id}" title="Marcar ${t.folio} como resuelto">Resuelto</button>` : canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" title="Reabrir ${t.folio}">Reabrir</button>` : ''}</td>` : ''}</tr>`; }).join('') : '<tr><td colspan="10" class="muted" style="text-align:center;padding:24px">Ningún ticket coincide con los filtros.</td></tr>'}
   </tbody></table></div>`;
 }
 async function vTickets() {
   if (S.sel) return vDetail();
   if (!S.users.length) S.users = await api('GET', '/api/users');
-  const f = S.fl, list = await api('GET', '/api/tickets?' + new URLSearchParams(Object.entries(f).filter(([, v]) => v)));
-  const sel = (id, k, opts) => `<div class="field"><label class="lbl" for="${id}">${{ status: 'Estado', type: 'Motivo', owner: 'Responsable', plat: 'Origen', due: 'Vencimiento', enr: 'Orden' }[k]}</label><select id="${id}" data-fl="${k}">${opts.map(([v, l]) => `<option value="${v}" ${f[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+  const f = S.fl, q = S.q, list = await api('GET', '/api/tickets?' + new URLSearchParams(q ? { q } : Object.entries(f).filter(([, v]) => v)));
+  const sel = (id, k, opts) => `<div class="field"><label class="lbl" for="${id}">${{ status: 'Estado', owner: 'Responsable' }[k]}</label><select id="${id}" data-fl="${k}" ${q ? 'disabled' : ''}>${opts.map(([v, l]) => `<option value="${v}" ${f[k] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
   return `<div class="panel-h"><h1>Bandeja de tickets</h1><span class="muted">Compartida por Victor y Customer Service · abrir un ticket no lo asigna · se actualiza sola</span></div>
   <section class="panel"><div class="filtersbar">
-    ${sel('f-st', 'status', [['abiertos', 'Abiertos'], ['sin', 'Sin responsable'], ['mios', 'Asignados a mí'], ['espera', 'Esperando respuesta'], ['dispose', 'Dispose programado'], ['cerrados', 'Cerrados'], ['', 'Todos']])}
-    ${sel('f-ty', 'type', [['', 'Todos'], ...Object.entries(S.me.types)])}
+    <div class="field tsearch"><label class="lbl" for="tq">Buscar por código MX/ES o guía</label>
+      <div class="row"><input type="search" id="tq" class="mono" value="${esc(q)}" placeholder="Escanea o teclea: MX-3015532, 4748635, 1Z999…" autocomplete="off" enterkeyhint="search">
+      <button class="btn" data-a="tq-go">Buscar</button>${q ? '<button class="btn" data-a="tq-clear">Limpiar</button>' : ''}</div></div>
+    ${sel('f-st', 'status', [['abiertos', 'Abiertos'], ['sin', 'Sin responsable'], ['mios', 'Asignados a mí'], ['espera', 'Esperando respuesta'], ['dispose', 'Dispose programado'], ['resueltos', 'Resueltos'], ['cerrados', 'Cerrados'], ['', 'Todos']])}
     ${sel('f-ow', 'owner', [['', 'Todos'], ['sin', 'Sin asignar'], ...S.users.filter(u => u.role === 'admin').map(u => [String(u.id), u.name])])}
-    ${sel('f-pl', 'plat', [['', 'MX y ES'], ['MX', 'Bringgo · MX'], ['ES', 'EasyShip · ES']])}
-    ${sel('f-du', 'due', [['', 'Cualquiera'], ['soon', 'Vence en 24 h'], ['late', 'Vencidos']])}
-    ${sel('f-en', 'enr', [['', 'Cualquiera'], ['buscando', 'Buscando'], ['lista', 'Lista'], ['sin', 'Sin coincidencias'], ['error', 'Error']])}
-  </div></section>
-  <section class="panel" style="padding:6px 8px">${ticketTable(list)}</section>`;
+  </div>${q ? `<p class="small muted" style="margin:8px 0 0">${list.length} resultado${list.length === 1 ? '' : 's'} para <b class="mono">${esc(q)}</b> en todos los estados · los filtros no aplican mientras buscas.</p>` : ''}</section>
+  <section class="panel" style="padding:6px 8px">${ticketTable(list, false, can('resolve'))}</section>`;
 }
 function orderPanel(t) {
   const h = '<div class="panel-h"><h3>Información de la orden</h3><span class="sp"></span>';
-  const box = `<div class="row" style="margin-top:10px"><input type="text" id="recode" class="mono" placeholder="MX-0000000, ES-000000 o guía" style="flex:1 1 200px"><button class="btn" data-a="research">Buscar de nuevo</button></div>`;
+  const box = `<div class="row" style="margin-top:10px"><input type="text" id="recode" class="mono" placeholder="MX-0000000, ES-0000000, número o guía" style="flex:1 1 200px"><button class="btn" data-a="research">Buscar de nuevo</button></div>`;
   const d = t.enr_data || {};
   if (t.enr_status === 'buscando') return `<section class="panel">${h}<span class="chip info">Buscando</span></div><p class="small">El agente de búsqueda está consultando Bringgo / EasyShip. Esta página se actualiza sola.</p></section>`;
   if (t.enr_status === 'lista') return `<section class="panel">${h}<span class="chip ok">${esc(t.enr_source)}</span></div>
@@ -227,7 +236,7 @@ async function vDetail() {
         ${t.description ? `<div><div class="lbl">Descripción</div><div class="v">${esc(t.description)}</div></div>` : ''}
         ${t.type === 'danado' ? `<div><div class="lbl">Desenlace del envío</div><div class="v">${esc(t.damage_outcome)}</div></div>` : ''}
       </div>
-      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b>${esc(t.resolution)}</div></div>` : ''}
+      ${t.resolution ? `<div class="banner ok" style="margin-top:14px"><span class="ic">✓</span><div><b>Resolución final</b>${esc(t.resolution)}</div>${canReopen(t) ? `<button class="btn sm" data-a="reopen" data-v="${t.id}" style="margin-left:auto">Reabrir</button>` : ''}</div>` : ''}
       ${t.status === 'Descartado' ? `<div class="banner bad" style="margin-top:14px"><span class="ic">!</span><div><b>Descartado por ${esc(t.discarded_by)} · ${fdt(t.discarded_at)}</b>${esc(t.discard_reason)}</div></div>` : ''}
     </section>
     ${orderPanel(t)}
@@ -313,7 +322,7 @@ async function vEquipo() {
   ${Object.entries(P).map(([k, l]) => `<tr><td>${esc(l)}</td><td class="no">No</td>${adm.map(u => u.perms.includes(k) ? '<td class="yes">Sí</td>' : '<td class="no">No</td>').join('')}</tr>`).join('')}
   </tbody></table></div></section>`;
 }
-const VIEWS = { registro: vRegistro, misreportes: vMisReportes, tickets: vTickets, tablero: vTablero, duplicados: vDuplicados, danados: vDanados, descartes: vDescartes, equipo: vEquipo };
+const VIEWS = { escaneo: vEscaneo, retornos: vRetornos, registro: vRegistro, misreportes: vMisReportes, tickets: vTickets, tablero: vTablero, duplicados: vDuplicados, danados: vDanados, descartes: vDescartes, equipo: vEquipo };
 
 /* ---------- Acciones ---------- */
 const fileData = f => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
@@ -331,12 +340,21 @@ async function tpost(path, body, msg) {
   try { const r = await api('POST', `/api/tickets/${S.sel}/${path}`, body || {}); if (msg) toast(msg); await render(); return r; }
   catch (e) { toast(esc(e.message)); await render(); }
 }
+function tsearch(v) {
+  const q = String(v || '').trim().replace(/\s+/g, '');
+  if (q && q.length < 4) { toast('Escribe al menos 4 caracteres del código o la guía.'); return; }
+  S.q = q; render();
+}
 function openTicket(id) { S.sel = Number(id); S.tab = 'chat'; S.ui = {}; if (S.view !== 'tickets') { history.replaceState(null, '', '#tickets'); S.view = 'tickets'; } render(); scrollTo(0, 0); }
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (e.target.id === 'nuname') { e.preventDefault(); $('[data-a="ualta-new"]')?.click(); return; }
-  if (e.target.id === 'scan') identify(e.target.value, 'scan');
+  if (e.target.id === 'rscan') { e.preventDefault(); rscan(e.target.value); }
+  else if (e.target.id === 'rs-q') { S.rs.q = e.target.value.trim(); render(); }
+  else if (e.target.id === 'tq') { e.preventDefault(); tsearch(e.target.value); }
+  else if (e.target.id === 'return-query') { S.returnQuery = e.target.value.trim(); render(); }
+  else if (e.target.id === 'scan') identify(e.target.value, 'scan');
   else if (e.target.id === 'code') identify(e.target.value, 'code');
   else if (e.target.dataset && e.target.dataset.f && !$('#regbtn')?.disabled) { e.preventDefault(); register(); }
   else if (e.target.matches && e.target.matches('tr[data-a=open]')) openTicket(e.target.dataset.v);
@@ -350,6 +368,8 @@ document.addEventListener('change', async e => {
   const el = e.target;
   if (el.id === 'cphoto') { const f = el.files && el.files[0]; if (!f) return; try { S.ui.photo = { name: f.name, data: await photoData(f) }; render(); } catch { toast('No se pudo leer la foto.'); } return; }
   if (el.dataset.fl !== undefined && el.dataset.fl) { S.fl[el.dataset.fl] = el.value; render(); }
+  else if (el.dataset.rsrack) { S.rs.keepFocus = true; try { S.rs.last = await api('POST', `/api/rscan/${el.dataset.rsrack}/rack`, { rack_id: Number(el.value) }); toast('Rack actualizado'); } catch (err) { toast(esc(err.message)); } render(); }
+  else if (el.dataset.rassign) { S.rs.keepFocus = true; try { await api('POST', '/api/racks/assign', { assign: { [el.dataset.rassign]: Number(el.value) } }); toast('Asignación guardada'); } catch (err) { toast(esc(err.message)); } render(); }
   else if (el.dataset.a === 'waiting') tpost('waiting', { dept: el.value || null });
   else if (el.dataset.a === 'dmg') tpost('damage-outcome', { outcome: el.value }, 'Desenlace guardado');
   else if (el.dataset.dmg) { try { await api('POST', `/api/tickets/${el.dataset.dmg}/damage-outcome`, { outcome: el.value }); toast('Desenlace guardado'); } catch (err) { toast(esc(err.message)); render(); } }
@@ -359,6 +379,25 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-a]'); if (!el || el.tagName === 'SELECT') return;
   const a = el.dataset.a, v = el.dataset.v, R = S.R;
   switch (a) {
+    case 'rs-go': rscan($('#rscan').value); break;
+    case 'rs-search': S.rs.q = $('#rs-q').value.trim(); render(); break;
+    case 'rs-carrier':
+      try { S.rs.last = await api('POST', `/api/rscan/${S.rs.last.id}/carrier`, { carrier: v }); S.rs.err = null; beep('ok'); await render(); }
+      catch (err) { toast(esc(err.message)); } break;
+    case 'rs-pick': { const r = (S.rs.rows || []).find(x => x.id === Number(v)); if (r) { S.rs.last = r; S.rs.err = null; render(); scrollTo(0, 0); } break; }
+    case 'rs-void': {
+      const reason = prompt('¿Por qué se anula este escaneo? (queda en el historial y en Observaciones de la hoja)'); if (!reason) break;
+      try { S.rs.last = await api('POST', `/api/rscan/${v}/void`, { reason }); await render(); } catch (err) { toast(esc(err.message)); } break;
+    }
+    case 'return-search': S.returnQuery = $('#return-query').value.trim(); render(); break;
+    case 'return-ticket':
+      el.disabled = true;
+      try { const r = await api('POST', '/api/returns/' + encodeURIComponent(v) + '/ticket', {}); toast(r.appended ? 'Ya había un ticket abierto: ' + esc(r.folio) : 'Ticket creado: ' + esc(r.folio)); openTicket(r.id); }
+      catch (err) { toast(esc(err.message)); el.disabled = false; } break;
+    case 'return-status':
+      el.disabled = true;
+      try { await api('POST', '/api/returns/' + encodeURIComponent(v) + '/status', { status: document.getElementById('rs-' + v).value }); await render(); }
+      catch (err) { toast(esc(err.message)); el.disabled = false; } break;
     case 'logout': await api('POST', '/api/logout'); showLogin(); break;
     case 'scan': identify($('#scan').value, 'scan'); break;
     case 'usecode': identify($('#code').value, 'code'); break;
@@ -367,6 +406,19 @@ document.addEventListener('click', async e => {
     case 'type': R.type = v; R.f = {}; await render(); if (v !== 'otro' && !R.nolabel) $('#regbtn')?.focus(); break;
     case 'register': register(); break;
     case 'open': openTicket(v); break;
+    case 'reopen':
+      el.disabled = true;
+      try { const r = await api('POST', `/api/tickets/${v}/reopen`); toast(`${esc(r.folio)} reabierto · ${esc(r.status)}`); }
+      catch (err) { toast(esc(err.message)); }
+      await render(); break;
+    case 'tq-go': tsearch($('#tq').value); break;
+    case 'tq-clear': S.q = ''; render(); break;
+    case 'qres': {
+      // Sin ventana de confirmación (pedido del propietario): un clic resuelve y queda en "Resueltos" y en el historial.
+      el.disabled = true; el.textContent = '…';
+      try { const r = await api('POST', `/api/tickets/${v}/quick-resolve`); toast(`${esc(r.folio)} resuelto · queda en Resueltos <button class="btn link" style="color:inherit;margin-left:8px" data-a="reopen" data-v="${r.id}">Reabrir</button>`); }
+      catch (err) { toast(esc(err.message)); }
+      await render(); break; }
     case 'back': S.sel = null; S.ui = {}; render(); break;
     case 'tab': S.tab = v; render(); break;
     case 'take': tpost('take', null, 'Ticket tomado'); break;
@@ -410,7 +462,8 @@ document.addEventListener('click', async e => {
 });
 
 /* ---------- Actualización automática ---------- */
-const typing = () => { const a = document.activeElement; return a && $('#view').contains(a) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName); };
+// El buscador de la bandeja siempre tiene el foco (lector): solo cuenta como "escribiendo" si tiene texto sin buscar.
+const typing = () => { const a = document.activeElement; if (a && a.id === 'tq') return a.value.trim() !== S.q; return a && $('#view').contains(a) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName); };
 setInterval(() => {
   if (!S.me || !isAdmin() || typing()) return;
   if (S.view === 'tickets' && !S.ui.photo && (!S.sel || (S.cache.t && S.cache.t.enr_status === 'buscando'))) render();
@@ -431,3 +484,62 @@ async function boot() {
   route();
 }
 boot();
+
+async function vRetornos() {
+ const data = await api('GET', '/api/returns');
+ const q = S.returnQuery || '';
+ const list = data.rows.filter(r => !q || [r.guide,r.carrier,r.rack,r.status].join(' ').toLowerCase().includes(q.toLowerCase()));
+ return '<div class="panel-h"><h1>Retornos escaneados</h1><a class="btn" href="'+esc(data.source)+'" target="_blank" rel="noopener noreferrer">Abrir Site original</a></div>' +
+ '<div class="banner warn"><div><b>'+(data.mode === 'demo' ? 'PRUEBA · datos ficticios' : 'Consulta privada del Site · hasta 2,000 retornos recientes')+'</b>'+(data.mode === 'demo' ? 'Los estados se reinician al detener el servidor. Los tickets son locales.' : 'Sheets alimenta Sites miércoles y sábados a las 19:30, hora México. Los estados reales se gestionan en el Site original.')+'<br>Consultado: '+esc(fdt(Date.parse(data.fetched_at)))+'</div></div>' +
+ '<section class="panel"><input id="return-query" aria-label="Buscar retornos" placeholder="Guía, paquetería, rack o estado" value="'+esc(q)+'"><button class="btn" data-a="return-search">Buscar / actualizar</button></section><section class="panel"><div class="tbl-wrap"><table><thead><tr><th>Guía</th><th>Paquetería</th><th>Rack</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>'+list.map(r => '<tr><td>'+esc(r.guide)+'</td><td>'+esc(r.carrier)+'</td><td>'+esc(r.rack ?? 'Sin asignar')+'</td><td>'+esc(r.status)+'</td><td>'+(isAdmin() ? '<button class="btn sm" data-a="return-ticket" data-v="'+esc(r.id)+'">Abrir ticket</button>' : 'Consulta')+(data.mode === 'demo' && can('resolve') ? '<select aria-label="Nuevo estado" id="rs-'+esc(r.id)+'">'+['recibido','acomodado','cerrado'].map(v => '<option '+(r.status===v?'selected':'')+'>'+v+'</option>').join('')+'</select><button class="btn sm" data-a="return-status" data-v="'+esc(r.id)+'">Guardar estado</button>' : '')+'</td></tr>').join('')+'</tbody></table>'+(list.length?'':'Sin resultados.')+'</div></section>';
+}
+
+/* ---------- Escaneo de retornos (ADR-002) ---------- */
+function beep(kind) {
+  try {
+    const ctx = beep.ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const tones = { ok: [[880, 0.08]], unknown: [[520, 0.12], [520, 0.12]], dup: [[220, 0.25], [180, 0.35]] }[kind] || [];
+    let t = ctx.currentTime;
+    for (const [f, d] of tones) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.value = 0.15; o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + d); t += d + 0.06; }
+  } catch {}
+}
+async function rscan(value) {
+  const guide = String(value || '').trim(); if (!guide) return;
+  const el = $('#rscan'); if (el) el.value = '';
+  try { S.rs.last = await api('POST', '/api/rscan', { guide }); S.rs.err = null; beep(S.rs.last.carrier === 'Por identificar' ? 'unknown' : 'ok'); }
+  catch (err) { S.rs.err = err.message; beep('dup'); }
+  await render();
+}
+const sheetChip = (s, on = true) => !on && s !== 'enviado' ? '<span class="chip neutral">Solo en esta PC</span>' : ({ enviado: '<span class="chip ok">En la hoja</span>', pendiente: '<span class="chip neutral">Pendiente</span>', error: '<span class="chip warn">Reintentando</span>', duplicado: '<span class="chip bad">Ya estaba en la hoja</span>' }[s] || esc(s));
+async function vEscaneo() {
+  const [data, rk] = await Promise.all([api('GET', '/api/rscan?q=' + encodeURIComponent(S.rs.q || '')), api('GET', '/api/racks')]);
+  S.rs.rows = data.rows;
+  const L = S.rs.last && (data.rows.find(r => r.id === S.rs.last.id) || S.rs.last), sy = data.sync;
+  const rackOpts = sel => rk.racks.filter(r => r.active).map(r => `<option value="${r.id}" ${r.id === sel ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
+  const syncBanner = !sy.configured ? '<div class="banner info"><span class="ic">i</span><div><b>Solo en esta PC</b>La hoja "Escaneo de Retornos" no está conectada (npm run retornos:setup). Los escaneos se guardan aquí.</div></div>'
+    : sy.last_error ? `<div class="banner warn"><span class="ic">!</span><div><b>La hoja no respondió</b>${esc(sy.last_error)} · ${sy.pending} pendientes; se reintenta solo. Puedes seguir escaneando.</div></div>` : '';
+  const result = S.rs.err ? `<div class="banner bad"><span class="ic">!</span><div><b>No se registró</b>${esc(S.rs.err)}</div></div>`
+    : L ? `<section class="panel"><div class="row" style="align-items:baseline;gap:14px;flex-wrap:wrap">
+        <span class="code">${esc(L.guide)}</span>${L.status === 'anulado' ? '<span class="chip neutral">Anulado</span>' : ''}${sheetChip(L.sheet_status, sy.configured)}</div>
+        <div class="kv" style="margin-top:12px"><div><div class="lbl">Paquetería</div><div style="font-family:var(--f-display);font-weight:700;font-size:2rem;line-height:1.1">${esc(L.carrier)}</div><div class="small muted">${esc(L.method)}</div></div>
+        <div><div class="lbl">Acomodar en</div><div style="font-family:var(--f-display);font-weight:700;font-size:2.6rem;line-height:1">${esc(L.rack_name || 'Sin rack')}</div>
+        ${L.status === 'anulado' ? '' : `<select aria-label="Cambiar rack" data-rsrack="${L.id}" style="margin-top:6px">${rackOpts(L.rack_id)}</select>`}</div></div>
+        ${L.status === 'anulado' ? `<p class="small muted">${esc(L.notes || '')}</p>` : `<div class="lbl" style="margin-top:14px">${L.carrier === 'Por identificar' ? 'Elige la paquetería (se aprende para la próxima)' : '¿No es correcta? Corrígela'}</div>
+        <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">${rk.carriers.filter(c => c !== 'Por identificar').map(c => `<button class="btn sm${c === L.carrier ? ' brand' : ''}" data-a="rs-carrier" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+        ${can('resolve') ? `<div class="row" style="margin-top:12px"><button class="btn sm ghost-danger" data-a="rs-void" data-v="${L.id}">Anular escaneo</button></div>` : ''}`}
+      </section>` : '';
+  const rackCfg = can('users') ? `<section class="panel"><h2 style="margin-top:0">Racks por paquetería</h2><p class="small muted">Cada paquetería va a un rack. "Por identificar" es el rack de espera. Lo cambia quien administra usuarios.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Paquetería</th><th>Rack</th></tr></thead><tbody>${rk.carriers.map(c => `<tr><td>${esc(c)}</td><td><select aria-label="Rack para ${esc(c)}" data-rassign="${esc(c)}">${rackOpts(rk.assign[c])}</select></td></tr>`).join('')}</tbody></table></div>
+      <p class="small muted">Ocupación: ${rk.racks.map(r => `${esc(r.name)}: ${r.count}`).join(' · ')}</p></section>` : '';
+  return `<div class="panel-h"><h1>Escanear retorno</h1><span class="sp"></span><span class="small muted">Guías confirmadas para aprender: ${sy.metrics.total}</span></div>
+  <div style="display:flex;flex-direction:column;gap:14px">${syncBanner}
+  <section class="scanbox"><label class="lbl" for="rscan">Escanea la guía del retorno (el lector termina con Enter)</label>
+    <div class="scanrow" style="margin-top:6px"><input id="rscan" class="scaninput" type="text" autocomplete="off" spellcheck="false" placeholder="Guía / RMA"><button class="btn brand" data-a="rs-go">Registrar</button></div></section>
+  ${result}
+  <section class="panel"><div class="row" style="gap:8px;flex-wrap:wrap"><h2 style="margin:0">Escaneados hoy · ${data.rows.length}</h2><span class="sp" style="flex:1"></span>
+    <input id="rs-q" aria-label="Buscar escaneos" placeholder="Guía, paquetería o rack" value="${esc(S.rs.q || '')}"><button class="btn sm" data-a="rs-search">Buscar</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Hora</th><th>Guía</th><th>Paquetería</th><th>Rack</th><th>Hoja</th><th>Operador</th></tr></thead><tbody>
+    ${data.rows.map(r => `<tr data-a="rs-pick" data-v="${r.id}" tabindex="0" style="cursor:pointer${r.status === 'anulado' ? ';opacity:.5' : ''}"><td>${fdt(r.created_at)}</td><td>${esc(r.guide)}</td><td>${esc(r.carrier)}</td><td>${esc(r.rack_name || '—')}</td><td>${sheetChip(r.sheet_status, sy.configured)}</td><td>${esc(r.operator)}</td></tr>`).join('')}
+    </tbody></table>${data.rows.length ? '' : '<p class="muted">Aún no hay escaneos hoy.</p>'}</div></section>
+  ${rackCfg}</div>`;
+}

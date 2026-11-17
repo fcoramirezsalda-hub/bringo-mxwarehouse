@@ -1,6 +1,6 @@
 # Contexto del proyecto · WMS México (MX Wharehouse)
 
-Última actualización: 2026-11-15 (2) · Claude Code
+Última actualización: 2026-11-17 · Claude Code
 
 ## Qué es
 
@@ -20,7 +20,7 @@ y da seguimiento con Victor y Customer Service. También cubre duplicados y reto
 | Repositorio del MVP | https://github.com/fcoramirezsalda-hub/bringo-mxwarehouse (este repositorio, desde 2026-11-15). El WMS original sigue sin estar disponible. |
 | Prototipo interactivo (HTML, sin backend) | Hecho: `prototype/mx-wharehouse.html`. Publicado como artifact "MX Wharehouse". |
 | Integración con Bringgo / EasyShip | Sin verificar. No hay credenciales ni documentación de API. |
-| Sistema de retornos actual (Google Sheets + Google Sites) | Sin revisar. No se tienen los archivos. |
+| Sistema de retornos actual (Google Sheets + Site) | Revisado en solo lectura (2026-11-17): hoja "Escaneo de Retornos" (captura Eyoyo + Apps Script) que alimenta un Site aparte. Ver `docs/ADR-001-retornos.md`. |
 
 > El documento de requisitos dice que el proyecto ya tiene trabajo previo con recepción, escaneo, inventario,
 > ubicaciones, racks y usuarios. Ese código **no** está en esta sesión. Antes de implementar nada, el siguiente
@@ -39,6 +39,8 @@ Decisión 2026-11-15: MVP nuevo e independiente (el repositorio del WMS original
 | Sesión | Usuario + PIN de 4 dígitos (scrypt), cookie HttpOnly de 14 h, bloqueo tras 5 intentos |
 | Agente de búsqueda | Proceso aparte `app/src/worker.js` + `app/src/connectors.js` (Playwright, solo lectura) |
 | Evidencias | Archivos en `app/data/evidencias/<ticket>/`, sin borrado desde la aplicación |
+| Retornos (consulta del Site) | `app/src/returns.js`, solo lectura, `RETURNS_MODE=off` por defecto (ADR-001) |
+| Escaneo de retornos | `app/src/retornos-escaneo.js` + `guias.js` (detección), 10 racks; copia a "Escaneo de Retornos" con `integraciones/google-sheets/Retornos.gs` (ADR-002). Apagado hasta `npm run retornos:setup` |
 | Pruebas | `npm test` (node:test) |
 
 

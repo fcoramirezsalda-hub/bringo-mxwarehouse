@@ -21,6 +21,8 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 1.4 | Endpoint "tomar ticket" atómico (`UPDATE … WHERE owner_id IS NULL`) y pruebas de concurrencia | Codex | pendiente |
 | 1.5 | Interfaz de registro de incidencias en 3 pasos sobre la API (prioridad 1) | Claude Code | pendiente |
 | 1.6 | Bandeja y detalle administrativo | Claude Code | pendiente |
+| 1.8 | Bandeja: solo filtros Estado y Responsable, buscador por código MX/ES o guía, botón "Resuelto" en la fila (CS y Victor) | Claude Code | hecho 2026-11-17 |
+| 1.9 | "Reabrir" ticket resuelto (fila, aviso tras resolver y detalle) | Claude Code | hecho 2026-11-17 |
 | 1.7 | Subida de evidencias a almacenamiento privado, sin borrado | Codex | pendiente |
 
 ## Fase 1b · Agente de búsqueda de órdenes
@@ -31,6 +33,7 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | 1b.2 | Mapear campos de Accept goods, Item Look Up (outbound) y EasyShip Item lookup | ChatGPT + propietario | pendiente |
 | 1b.0 | Prueba de concepto en la PC de la bodega (`agent-poc/`) | Claude Code | en curso: falta conectar la PC |
 | 1b.3 | Cola `enrichment_jobs` + worker idempotente con reintentos y bitácora | Codex | bloqueado: 1b.1 |
+| 1b.5 | Teclear MX/ES sin prefijo (solo el número) y leer la orden ES en `prepare-v2/<número>` | Claude Code | hecho 2026-11-17 (falta probar con EasyShip real) |
 | 1b.4 | Panel "Información de la orden" en el ticket y columna "Orden" en la bandeja | Claude Code | hecho en prototipo |
 
 ## Fase 2 · Plazos y duplicados
@@ -47,8 +50,15 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 |---|---|---|---|
 | 3.1 | Descarte con justificación, doble confirmación, archivo y restauración | Claude Code | pendiente |
 | 3.2 | Chat interno por ticket con tipos de instrucción | Claude Code | pendiente |
-| 3.3 | Propuesta de sincronización con Google Sheets de retornos | ChatGPT → propietario | pendiente |
-| 3.4 | Implementar la sincronización aprobada | Claude Code | bloqueado: falta aprobación |
+| 3.3 | Propuesta de sincronización con Google Sheets de retornos | Claude Code → propietario | propuesta en `docs/ADR-001-retornos.md` |
+| 3.4 | Implementar la fuente real aprobada (adaptador `sheet`) | Claude Code | bloqueado: falta aprobación |
+| 3.6 | Propuesta: escanear retornos en MX Wharehouse, detección automática, racks y espejo en la hoja (`docs/ADR-002-escaneo-retornos.md`) | Claude Code → propietario | aprobada 2026-11-17 |
+| 3.7 | R2.1 Detector `guias.js` (port de la hoja + verificador FedEx) y backtest contra el historial | Claude Code | hecho 2026-11-17 |
+| 3.8 | R2.2 Pantalla "Escanear retorno", anti-duplicado y aprendizaje | Claude Code | hecho 2026-11-17 |
+| 3.9 | R2.3 Racks por paquetería (10), cambio manual, anulación | Claude Code | hecho 2026-11-17 |
+| 3.10 | R2.4 Envío a "Escaneo de Retornos" (Apps Script nuevo, columna J Rack) con cola y reintentos | Claude Code | hecho 2026-11-17 |
+| 3.11 | R2.5 Instalar Retornos.gs, `npm run retornos:setup` en la PC de la bodega y piloto | Propietario + Claude Code | pendiente |
+| 3.5 | Menú "Retornos escaneados" (apagado por defecto, demo, abrir ticket) a partir del ZIP de Codex | Claude Code | hecho 2026-11-17 |
 
 ## Hecho
 

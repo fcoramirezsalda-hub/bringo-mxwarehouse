@@ -1,6 +1,8 @@
 // Lectores de Bringgo y EasyShip con Playwright. SOLO LECTURA:
 // únicamente escriben en el campo de búsqueda y presionan "Search"/Enter.
 // Nunca presionan Accept, Print, Add Package, Wrong Product ni nada que cambie datos.
+// En la orden de EasyShip (prepare-v2) solo se abre la página y se lee: nunca "Send with standard",
+// "Save Changes", "Change", "Add Note" ni "Report an Exception".
 const fs = require('fs');
 const path = require('path');
 
@@ -8,6 +10,7 @@ const URLS = {
   bringgoAccept: 'https://app.bringgoship.com/en/dropshipping/add-package',
   bringgoLookup: 'https://app.bringgoship.com/en/dropshipping/item-lookup',
   easyLookup: 'https://warehouse.easyshipping.cloud/lookup/',
+  easyOrder: n => `https://warehouse.easyshipping.cloud/prepare-v2/${n}/`,
 };
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const clean = v => String(v ?? '').replace(EMAIL, '').replace(/\s*\|\s*$/, '').replace(/^\s*\|\s*/, '').trim();
@@ -113,11 +116,54 @@ async function easyLookup(page, value) {
   return { source: 'EasyShip · Item lookup', code, product: all[0].product, fields: all[0].fields, candidates: all.length > 1 ? all.map(c => Object.fromEntries(c.fields)) : [] };
 }
 
+// EasyShip · orden por número (ES-4748635 → /prepare-v2/4748635/). Es la pantalla que sale al buscar el ES.
+// Solo lectura: abre la página y lee el texto. Devuelve null si no existe la orden.
+async function easyOrder(page, num) {
+  const res = await page.goto(URLS.easyOrder(num), { waitUntil: 'networkidle' }); await checkLogin(page);
+  if (res && res.status() >= 400) return null;
+  const ok = await page.getByText(/User Info/i).first().waitFor({ timeout: 12000 }).then(() => true).catch(() => false);
+  if (!ok) return null;
+  const text = await page.locator('main').first().innerText().catch(() => '') || await page.locator('body').innerText();
+  const lines = text.split('\n').map(s => clean(s)).filter(Boolean);
+  const status = (text.match(/\b[A-Z]{3,}(?:_[A-Z]+)+\b/) || [])[0];
+  const user = (text.match(/User Info\s*-\s*#(\d+)/i) || [])[1];
+  const amazon = (text.match(/\b\d{3}-\d{7}-\d{7}\b/) || [])[0];
+  const asin = (text.match(/\bB0[A-Z0-9]{8}\b/) || [])[0];
+  const weight = (text.match(/Box Price\s*\[([^\]]+)\]/i) || [])[1];
+  const sel = lines.findIndex(l => /SELECTED/i.test(l));
+  const carrier = sel < 0 ? null : lines.slice(Math.max(0, sel - 4), sel + 1).reverse().find(l => / > /.test(l)) || null;
+  const product = asin ? lines[lines.findIndex(l => l.includes(asin)) - 1] || null : null;
+  const fields = [['Orden EasyShip', '#' + num + (status ? ' · ' + status : '')], ...(user ? [['Usuario', '#' + user]] : []),
+    ...(product ? [['Producto', product]] : []), ...(asin ? [['ASIN', asin]] : []), ...(amazon ? [['Orden Amazon', amazon]] : []),
+    ...(carrier ? [['Paquetería', carrier.replace(/\s*(CHARGED|USER'S CHOICE|SELECTED).*$/i, '')]] : []), ...(weight ? [['Peso', weight]] : [])];
+  return { source: 'EasyShip · Orden', code: 'ES-' + num, product, fields, candidates: [] };
+}
+
+async function findES(page, code, tried) {
+  const num = code.slice(3);
+  tried.push('EasyShip · Orden'); let r = await easyOrder(page, num); if (r) return r;
+  tried.push('EasyShip · Item lookup'); r = await easyLookup(page, code); return r ? { ...r, code: r.code || code } : null;
+}
+
 // Elige dónde buscar según lo registrado.
 async function lookup(page, { code, trk }) {
   const tried = [];
+  // Número sin MX/ES: se busca como MX-… en Bringgo y como ES-… en EasyShip.
+  if (code && /^\d+$/.test(code)) {
+    tried.push(`Bringgo · Accept goods (MX-${code})`); const mx = await bringgoByMX(page, 'MX-' + code);
+    const es = await findES(page, 'ES-' + code, tried);
+    if (mx && es) {
+      const asObj = (src, r) => ({ Plataforma: src, Código: r.code, ...Object.fromEntries(r.fields) });
+      return { source: 'Bringgo y EasyShip', code: null, product: null, tried,
+        fields: [['Atención', `El número ${code} existe como MX-${code} y como ES-${code}: confirma cuál es y búscalo de nuevo con el prefijo.`]],
+        candidates: [asObj('Bringgo', { ...mx, code: mx.code || 'MX-' + code }), asObj('EasyShip', es)] };
+    }
+    if (mx) return { ...mx, code: mx.code || 'MX-' + code, source: 'Bringgo · Accept goods', tried };
+    if (es) return { ...es, tried };
+    return { none: true, tried };
+  }
   if (code && code.startsWith('MX')) { tried.push('Bringgo · Accept goods'); const r = await bringgoByMX(page, code); if (r) return { ...r, source: 'Bringgo · Accept goods', tried }; }
-  if (code && code.startsWith('ES')) { tried.push('EasyShip · Item lookup'); const r = await easyLookup(page, code); if (r) return { ...r, code: r.code || code, tried }; }
+  if (code && code.startsWith('ES')) { const r = await findES(page, code, tried); if (r) return { ...r, tried }; }
   if (trk) {
     tried.push('Bringgo · Item Look Up (Outbound/Inbound/Canceled)'); let r = await bringgoByTracking(page, trk); if (r) return { ...r, tried };
     tried.push('EasyShip · Item lookup'); r = await easyLookup(page, trk); if (r) return { ...r, tried };
