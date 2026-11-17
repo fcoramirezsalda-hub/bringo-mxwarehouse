@@ -23,6 +23,7 @@
 | 2026-11-15 | Inicio de sesión con usuario + PIN de 4 dígitos; Francisco R. restablece PINs. | Claude Code (propuesta, confirmar) |
 | 2026-11-15 | Mientras no haya nube autorizada, los tickets y su historial se copian cada minuto a una hoja de Google Sheets en el Drive del propietario (Apps Script con token). La base local sigue siendo la principal. | Propietario |
 | 2026-11-15 | Dañado o con escurrimiento: se re-empaca y se envía. No abre ticket para CS; queda en un registro de "Enviados dañados" con desenlace (pendiente, regresó, dispose de paquetería, entregado). | Propietario |
+| 2026-11-17 | Chat interno sin "tipo" de mensaje. Las fotos se envían desde el chat (texto, foto o ambos) y se quitó la pestaña Evidencias. Las fotos siguen siendo evidencias del expediente y no se borran. | Propietario |
 
 ## Pendientes (requieren respuesta del propietario)
 

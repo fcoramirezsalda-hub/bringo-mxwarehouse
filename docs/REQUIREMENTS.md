@@ -54,7 +54,8 @@ departamento del que se espera respuesta, ubicación física, historial, chat in
 
 - Uno por ticket, disponible bajo demanda (no se abre solo). ✅
 - Mensajes, fotos e instrucciones con autor y fecha. ✅
-- Tipos para documentar instrucciones del equipo turco y de vendedores de Amazon. ✅
+- ~~Tipos para documentar instrucciones del equipo turco y de vendedores de Amazon~~ (retirado 2026-11-17: se escribe en el texto del mensaje). Mensajes anteriores conservan su etiqueta.
+- Fotos dentro del chat: texto, foto o ambos en un envío; quedan como evidencia del expediente. ✅
 
 ## 4. Plazos
 

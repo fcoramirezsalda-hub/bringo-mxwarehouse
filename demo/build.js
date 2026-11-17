@@ -6,8 +6,7 @@ const rd = p => fs.readFileSync(path.join(root, p), 'utf8');
 const version = JSON.parse(rd('app/package.json')).version;
 let js = rd('app/public/app.js');
 const swaps = [
-  ['href="/api/evidence/${e.id}" target="_blank"', 'href="${e.src || \'#\'}" target="_blank"'],
-  ['src="/api/evidence/${e.id}"', 'src="${e.src || \'\'}"'],
+  ['url = `/api/evidence/${e.id}`;', "url = e.src || '#';"],
 ];
 for (const [a, b] of swaps) { if (!js.includes(a)) throw new Error('No encontré en app.js: ' + a); js = js.split(a).join(b); }
 const body = rd('app/public/index.html').match(/<body>([\s\S]*?)<script src="app.js"><\/script>/)[1];

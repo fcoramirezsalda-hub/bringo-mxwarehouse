@@ -132,3 +132,24 @@ test('solo quien administra usuarios restablece PIN', async () => {
   const r = await fra('POST', '/api/users/1/pin');
   assert.strictEqual(r.status, 200); assert.match(r.body.pin, /^\d{4}$/);
 });
+
+test('chat: texto, foto o ambos en un envío; la foto queda como evidencia y no hay tipo de mensaje', async () => {
+  const fra = await login('Francisco R.'), fat = await login('Aracely');
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const t = await fat('POST', '/api/incidents', { type: 'producto', code: 'MX-3017755' });
+  const id = t.body.id;
+  assert.strictEqual((await fra('POST', `/api/tickets/${id}/messages`, {})).status, 400, 'vacío se rechaza');
+  assert.strictEqual((await fat('POST', `/api/tickets/${id}/messages`, { body: 'hola' })).status, 403, 'operador no usa el chat');
+  const a = await fra('POST', `/api/tickets/${id}/messages`, { body: 'Caja abierta, adjunto foto', photo: { name: 'caja.png', data: png }, tag: 'Instrucción del equipo turco' });
+  assert.strictEqual(a.status, 200); assert.ok(a.body.evidence_id);
+  const b = await fra('POST', `/api/tickets/${id}/messages`, { photo: { name: 'etiqueta.png', data: png } });
+  assert.strictEqual(b.status, 200);
+  const c = await fra('POST', `/api/tickets/${id}/messages`, { photo: { name: 'x.gif', data: 'data:image/gif;base64,R0lGOD' } });
+  assert.strictEqual(c.status, 400, 'formato no permitido');
+  const d = await fra('GET', '/api/tickets/' + id);
+  assert.strictEqual(d.body.messages.length, 1);
+  assert.strictEqual(d.body.messages[0].tag, 'Mensaje', 'el tipo enviado se ignora');
+  assert.strictEqual(d.body.evidence.length, 2);
+  const img = await fetch(base + '/api/evidence/' + a.body.evidence_id, { headers: { Cookie: '' } });
+  assert.strictEqual(img.status, 401, 'la foto no se ve sin sesión');
+});

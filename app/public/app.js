@@ -190,14 +190,26 @@ async function vDetail() {
   if (!S.users.length) S.users = await api('GET', '/api/users');
   const mine = t.owner_id === S.me.id, manage = mine || can('transfer'), active = t.open && t.status !== 'Dispose programado', d = dueInfo(t);
   const admins = S.users.filter(u => u.role === 'admin' && u.active);
-  const tabs = [['chat', `Chat interno (${t.messages.length})`], ['hist', `Historial (${t.events.length})`], ['ev', `Evidencias (${t.evidence.length})`]];
+  const chatItems = [...t.messages.map(m => ({ k: 'm', at: m.created_at, who: m.who, m })), ...t.evidence.map(e => ({ k: 'e', at: e.created_at, who: e.who, e }))].sort((x, y) => x.at - y.at || (x.k === 'e' ? -1 : 1));
+  const tabs = [['chat', `Chat interno (${t.messages.length + t.evidence.length})`], ['hist', `Historial (${t.events.length})`]];
+  const bubble = it => {
+    const head = `<div class="mh"><b>${esc(it.who)}</b><span>${fdt(it.at)}</span>${it.k === 'm' && it.m.tag !== 'Mensaje' ? `<span class="chip ${it.m.tag.includes('turco') ? 'info' : 'warn'}">${esc(it.m.tag)}</span>` : ''}${it.k === 'e' && it.e.purpose === 'dispose' ? '<span class="chip bad">Evidencia de disposición</span>' : ''}</div>`;
+    if (it.k === 'm') return `<div class="msg ${it.who === S.me.name ? 'mine' : ''}">${head}${esc(it.m.body)}</div>`;
+    const e = it.e, url = `/api/evidence/${e.id}`;
+    return `<div class="msg photo ${it.who === S.me.name ? 'mine' : ''}">${head}<a href="${url}" target="_blank" rel="noopener">${e.mime.startsWith('image/') ? `<img src="${url}" alt="${esc(e.file_name)}" loading="lazy">` : `<span class="chip neutral">PDF · ${esc(e.file_name)}</span>`}</a>${it.caption ? `<div class="caption">${esc(it.caption)}</div>` : ''}</div>`;
+  };
+  // Foto y texto enviados juntos (misma persona, menos de 5 s) se muestran en una sola burbuja.
+  for (let i = 0; i < chatItems.length - 1; i++) {
+    const a = chatItems[i], b = chatItems[i + 1];
+    if (a.k === 'e' && b.k === 'm' && a.who === b.who && Math.abs(b.at - a.at) < 5000 && !a.caption && b.m.tag === 'Mensaje') { a.caption = b.m.body; chatItems.splice(i + 1, 1); }
+  }
+  const pending = S.ui.photo ? `<span class="chip ok">Foto: ${esc(S.ui.photo.name)} <button class="linkx" data-a="nophoto" aria-label="Quitar foto">✕</button></span>` : '';
   const tab = S.tab === 'hist' ? `<ul class="timeline">${t.events.map(e => `<li><span class="mono muted">${fdt(e.created_at)}</span><span><b>${esc(e.who)}</b> · ${esc(e.text)}</span></li>`).join('')}</ul>`
-    : S.tab === 'ev' ? `<div class="evgrid">${t.evidence.map(e => `<a class="ev" href="/api/evidence/${e.id}" target="_blank" rel="noopener"><div class="im">${e.mime.startsWith('image/') ? `<img src="/api/evidence/${e.id}" alt="${esc(e.file_name)}" loading="lazy">` : 'PDF'}</div><div class="cap"><b>${esc(e.file_name)}</b><div class="muted">${esc(e.who)} · ${fdt(e.created_at)}</div></div></a>`).join('') || '<p class="muted">Sin evidencias.</p>'}</div>
-      <div class="row" style="margin-top:12px"><input type="file" id="evfile" accept="image/*,application/pdf"><button class="btn" data-a="addev">Adjuntar al expediente</button></div><p class="muted small" style="margin-top:6px">Las evidencias no se eliminan.</p>`
-    : `${!t.messages.length && !S.ui.chatOpen ? `<div class="empty"><h3>Sin conversación</h3><p>El chat se abre cuando hace falta coordinar algo.</p><button class="btn brand" style="margin-top:12px" data-a="openchat">Iniciar conversación</button></div>`
-      : `<div class="chat">${t.messages.map(m => `<div class="msg ${m.who === S.me.name ? 'mine' : ''}"><div class="mh"><b>${esc(m.who)}</b><span>${fdt(m.created_at)}</span>${m.tag !== 'Mensaje' ? `<span class="chip ${m.tag.includes('turco') ? 'info' : 'warn'}">${esc(m.tag)}</span>` : ''}</div>${esc(m.body)}</div>`).join('')}
-        <div class="field"><div class="row"><label class="lbl" for="ctag">Tipo</label><select id="ctag">${S.me.tags.map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
-        <textarea id="cmsg" data-ui="cmsg" placeholder="Escribe un mensaje o documenta la instrucción recibida">${esc(S.ui.cmsg || '')}</textarea><div class="row"><span style="flex:1"></span><button class="btn brand" data-a="sendchat">Enviar</button></div></div></div>`}`;
+    : `${!chatItems.length && !S.ui.chatOpen ? `<div class="empty"><h3>Sin conversación</h3><p>El chat se abre cuando hace falta coordinar algo. Aquí también se suben las fotos.</p><button class="btn brand" style="margin-top:12px" data-a="openchat">Iniciar conversación</button></div>`
+      : `<div class="chat">${chatItems.map(bubble).join('')}
+        <div class="field composer"><textarea id="cmsg" data-ui="cmsg" placeholder="Escribe un mensaje o una instrucción recibida">${esc(S.ui.cmsg || '')}</textarea>
+        <div class="row"><label class="btn sm" for="cphoto">Adjuntar foto</label><input type="file" id="cphoto" accept="image/*,application/pdf" capture="environment" class="visually-hidden">${pending}<span style="flex:1"></span><button class="btn brand" data-a="sendchat" id="sendbtn">Enviar</button></div>
+        <p class="muted small">Las fotos quedan en el expediente y no se pueden borrar.</p></div></div>`}`;
   const disc = S.ui.disc || 0;
   return `<div class="row"><button class="btn sm" data-a="back">← Bandeja</button></div>
   <div class="detail"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
@@ -291,6 +303,16 @@ const VIEWS = { registro: vRegistro, misreportes: vMisReportes, tickets: vTicket
 
 /* ---------- Acciones ---------- */
 const fileData = f => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
+// Fotos de celular: se reducen a 1600 px (JPG) antes de enviarlas para que suban rápido.
+async function photoData(f) {
+  if (!/^image\/(jpeg|png|webp)$/.test(f.type) || f.size < 1.2e6) return fileData(f);
+  try {
+    const img = await createImageBitmap(f), k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85);
+  } catch { return fileData(f); }
+}
 async function tpost(path, body, msg) {
   try { const r = await api('POST', `/api/tickets/${S.sel}/${path}`, body || {}); if (msg) toast(msg); await render(); return r; }
   catch (e) { toast(esc(e.message)); await render(); }
@@ -311,6 +333,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const el = e.target;
+  if (el.id === 'cphoto') { const f = el.files && el.files[0]; if (!f) return; try { S.ui.photo = { name: f.name, data: await photoData(f) }; render(); } catch { toast('No se pudo leer la foto.'); } return; }
   if (el.dataset.fl !== undefined && el.dataset.fl) { S.fl[el.dataset.fl] = el.value; render(); }
   else if (el.dataset.a === 'waiting') tpost('waiting', { dept: el.value || null });
   else if (el.dataset.a === 'dmg') tpost('damage-outcome', { outcome: el.value }, 'Desenlace guardado');
@@ -338,19 +361,26 @@ document.addEventListener('click', async e => {
     case 'confirmdup': tpost('confirm-dup', null, 'Duplicado confirmado: inicia el plazo de 10 días'); break;
     case 'resolve': { const r = await tpost('resolve', { resolution: $('#res').value }, 'Ticket resuelto'); if (r) S.ui.res = ''; break; }
     case 'openchat': S.ui.chatOpen = true; render(); break;
-    case 'sendchat': { const r = await tpost('messages', { tag: $('#ctag').value, body: $('#cmsg').value }); if (r) { S.ui.cmsg = ''; render(); } break; }
+    case 'sendchat': {
+      const body = ($('#cmsg').value || '').trim(), photo = S.ui.photo;
+      if (!body && !photo) { toast('Escribe un mensaje o adjunta una foto.'); break; }
+      el.disabled = true;
+      const r = await tpost('messages', { body, photo: photo ? { name: photo.name, data: photo.data } : undefined });
+      if (r) { S.ui.cmsg = ''; S.ui.photo = null; render(); } else el.disabled = false;
+      break; }
+    case 'nophoto': S.ui.photo = null; render(); break;
     case 'research': tpost('research', { value: $('#recode').value }, 'En cola: el agente buscará en unos minutos'); break;
     case 'disc1': S.ui.disc = 1; render(); break;
     case 'disc0': S.ui.disc = 0; render(); break;
     case 'disc2': if ((S.ui.why || '').trim().length < 10) { toast('La justificación es obligatoria (mínimo 10 caracteres).'); break; } S.ui.disc = 2; render(); break;
     case 'discgo': { const r = await tpost('discard', { reason: S.ui.why, confirm: true }, 'Pasó al archivo de descartes'); if (r) S.ui = {}; break; }
     case 'restore': tpost('restore', null, 'Ticket restaurado'); break;
-    case 'addev': case 'disposedone': {
-      const inp = $(a === 'addev' ? '#evfile' : '#dspfile'), f = inp && inp.files[0];
-      if (!f) { toast('Elige un archivo.'); break; }
+    case 'disposedone': {
+      const inp = $('#dspfile'), f = inp && inp.files[0];
+      if (!f) { toast('Elige la foto de la disposición.'); break; }
       try {
-        const up = await api('POST', `/api/tickets/${S.sel}/evidence`, { name: f.name, data: await fileData(f), purpose: a === 'disposedone' ? 'dispose' : 'general' });
-        if (a === 'disposedone') await tpost('dispose-done', { evidence_id: up.id }, 'Disposición confirmada con evidencia'); else { toast('Evidencia agregada'); render(); }
+        const up = await api('POST', `/api/tickets/${S.sel}/evidence`, { name: f.name, data: await photoData(f), purpose: 'dispose' });
+        await tpost('dispose-done', { evidence_id: up.id }, 'Disposición confirmada con evidencia');
       } catch (err) { toast(esc(err.message)); }
       break; }
     case 'pin': try { S.ui.newpin = await api('POST', `/api/users/${v}/pin`); render(); } catch (err) { toast(esc(err.message)); } break;
@@ -361,7 +391,7 @@ document.addEventListener('click', async e => {
 const typing = () => { const a = document.activeElement; return a && $('#view').contains(a) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName); };
 setInterval(() => {
   if (!S.me || !isAdmin() || typing()) return;
-  if (S.view === 'tickets' && (!S.sel || (S.cache.t && S.cache.t.enr_status === 'buscando'))) render();
+  if (S.view === 'tickets' && !S.ui.photo && (!S.sel || (S.cache.t && S.cache.t.enr_status === 'buscando'))) render();
 }, 20000);
 async function agentStatus() {
   if (!S.me) return;

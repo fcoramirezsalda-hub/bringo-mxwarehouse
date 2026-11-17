@@ -162,13 +162,13 @@ function setLocation(db, user, id, loc) {
     event(db, id, user, 'ubicacion', 'Ubicación física: ' + (v || 'sin registrar'));
   });
 }
-function addMessage(db, user, id, tag, body) {
+function addMessage(db, user, id, body, now = Date.now()) {
   needAdmin(user);
   const t = db.prepare('SELECT id FROM tickets WHERE id=?').get(id); if (!t) fail(404, 'No existe ese ticket.');
   const b = String(body || '').trim().slice(0, 4000); if (!b) fail(400, 'Escribe un mensaje.');
-  const g = MSG_TAGS.includes(tag) ? tag : 'Mensaje';
-  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, tag, body, created_at) VALUES (?,?,?,?,?)').run(id, user.id, g, b, Date.now());
-  event(db, id, user, 'chat', g === 'Mensaje' ? 'Escribió en el chat' : 'Documentó: ' + g);
+  // El campo "tag" se conserva para mensajes anteriores; los nuevos ya no llevan tipo.
+  db.prepare('INSERT INTO ticket_messages (ticket_id, author_id, tag, body, created_at) VALUES (?,?,?,?,?)').run(id, user.id, 'Mensaje', b, now);
+  event(db, id, user, 'chat', 'Escribió en el chat', now);
 }
 function confirmDup(db, user, id, now = Date.now()) {
   need(user, 'confirmdup');

@@ -1,5 +1,22 @@
 # Handoff
 
+## 2026-11-17 (3) · Claude Code · chat con fotos (v0.3.0) · rama `agente/claude/chat-evidencias`
+
+**Diseño**
+- Sin migración: las fotos siguen en `ticket_evidence` y los mensajes en `ticket_messages`. La interfaz arma una sola línea de tiempo
+  ordenada por hora; foto + texto de la misma persona con menos de 5 s de diferencia se muestran en una burbuja.
+- `POST /api/tickets/:id/messages` acepta `{ body?, photo?: { name, data } }` (al menos uno). Guarda la foto como evidencia y el texto como mensaje.
+  El campo `tag` ya no se usa; los mensajes nuevos se guardan como "Mensaje" y los anteriores conservan su etiqueta.
+- `POST /api/tickets/:id/evidence` se queda solo para la evidencia de Dispose.
+- Se quitó la pestaña Evidencias; las fotos de Dispose también aparecen en el chat con la etiqueta "Evidencia de disposición".
+- Fotos de más de 1.2 MB se reducen en el navegador a 1600 px JPG antes de subir.
+- Errores de JSON mal formado ya no devuelven la traza interna: responden `{"error":"Solicitud no válida."}`.
+
+**Pruebas:** 10/10 (`npm test`, nueva prueba del chat). En navegador, servidor real y demo: sin menú de tipo, 2 pestañas,
+foto + texto en una burbuja, foto sola, envío vacío rechazado, sin errores.
+
+**Para revisar después:** si el chat crece mucho, paginarlo; si CS necesita filtrar instrucciones del equipo turco, volver a una etiqueta opcional.
+
 ## 2026-11-17 (2) · Claude Code · demo publicada de la plataforma real
 
 - El link del panel "MX Wharehouse" (https://claude.ai/artifact/AohXAPkYV8vAeoeb1g1zCy) ya no muestra la maqueta vieja:

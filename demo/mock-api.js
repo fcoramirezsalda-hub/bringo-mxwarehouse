@@ -4,7 +4,7 @@
    Los datos viven solo en este navegador (localStorage). PIN de prueba para todos: 1234. */
 (function () {
   'use strict';
-  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v2', PIN = '1234';
+  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v3', PIN = '1234';
   const TYPES = { inbound: 'Guía no reconocida', producto: 'Sin producto o diferente', danado: 'Dañado o con escurrimiento', extradept: 'Extra Dept', sinetiqueta: 'Sin etiqueta', nouse: 'No use label', duplicado: 'Duplicado', otro: 'Otro' };
   const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
   const DEPTS = ['Bringgo', 'EasyShip', 'Equipo turco', 'Vendedor Amazon', 'Murat (Laredo)', 'Customer Service', 'Procesamiento'];
@@ -55,9 +55,9 @@
     mk('Mauricio', { type: 'danado', code: 'MX-3008120' }, 26 * H);
     const vic = U('Victor'), sam = U('Samantha M.');
     take(vic, g.id, t0 - 4 * H); setWaiting(vic, g.id, 'Bringgo', t0 - 3 * H);
-    msg(vic, g.id, 'Mensaje', 'Ya se dejó el mensaje en Bringgo. Queda en el anaquel A-03.', t0 - 3 * H);
+    msg(vic, g.id, 'Ya se dejó el mensaje en Bringgo. Queda en el anaquel A-03.', t0 - 3 * H);
     take(sam, d.id, t0 - 5 * D); confirmDup(sam, d.id, t0 - 5 * D + H); setWaiting(sam, d.id, 'Vendedor Amazon', t0 - 5 * D + 2 * H);
-    msg(sam, d.id, 'Instrucción del vendedor Amazon', 'El vendedor pide esperar a que generen una nueva orden.', t0 - 4 * D);
+    msg(sam, d.id, 'Instrucción del vendedor: esperar a que generen una nueva orden.', t0 - 4 * D);
     agent(); deadlines();
   }
   const tk = id => { const t = DB.tickets.find(x => x.id === Number(id)); if (!t) fail(404, 'No existe ese ticket.'); return t; };
@@ -108,11 +108,16 @@
     if (t.status !== 'Dispose programado') t.status = d ? 'Esperando respuesta' : (t.owner_id ? 'En gestión' : 'Abierto');
     t.waiting_dept = d; event(t, u, 'espera', d ? `Esperando respuesta de ${d}` : 'Ya no se espera respuesta de otro departamento', at);
   }
-  function msg(u, id, tag, body, at = now()) {
+  function msg(u, id, body, at = now()) {
     needAdmin(u); const t = tk(id); const b = String(body || '').trim(); if (!b) fail(400, 'Escribe un mensaje.');
-    const g = TAGS.includes(tag) ? tag : 'Mensaje';
-    DB.messages.push({ id: ++DB.msg, ticket_id: t.id, who: u.name, tag: g, body: b, created_at: at });
-    event(t, u, 'chat', g === 'Mensaje' ? 'Escribió en el chat' : 'Documentó: ' + g, at);
+    DB.messages.push({ id: ++DB.msg, ticket_id: t.id, who: u.name, tag: 'Mensaje', body: b, created_at: at });
+    event(t, u, 'chat', 'Escribió en el chat', at);
+  }
+  function addEvidence(u, t, file, purpose, label) {
+    const mm = String((file && file.data) || '').match(/^data:([\w/+.-]+);base64,/); if (!mm || !/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(mm[1])) fail(400, 'Sube una foto (JPG, PNG, WEBP) o PDF.');
+    if (file.data.length > 6e6) fail(400, 'En la demo el archivo debe pesar menos de 4 MB.');
+    const e = { id: ++DB.evid, ticket_id: t.id, file_name: String(file.name || 'foto').slice(0, 80), mime: mm[1], purpose: purpose === 'dispose' ? 'dispose' : 'general', who: u.name, created_at: now(), data: file.data.length < 1.5e6 ? file.data : null };
+    DB.evidence.push(e); event(t, u, 'evidencia', label + ': ' + e.file_name); return e.id;
   }
   function confirmDup(u, id, at = now()) {
     need(u, 'confirmdup'); const t = openT(id); if (t.type !== 'duplicado') fail(400, 'Solo aplica a tickets de duplicado.');
@@ -209,10 +214,10 @@
       case 'transfer': { const o = openT(id); manage(u, o); const to = DB.users.find(x => x.id === Number(body.to) && x.role === 'admin'); if (!to) fail(400, 'Elige a una persona de Procesamiento o Customer Service.'); const prev = o.owner_id ? user(o.owner_id).name : 'sin responsable'; o.owner_id = to.id; if (o.status === 'Abierto') o.status = 'En gestión'; event(o, u, 'asignacion', `Transfirió de ${prev} a ${to.name}`); break; }
       case 'waiting': setWaiting(u, id, body.dept); break;
       case 'location': { const o = openT(id); manage(u, o); o.location = String(body.location || '').trim() || null; event(o, u, 'ubicacion', 'Ubicación física: ' + (o.location || 'sin registrar')); break; }
-      case 'messages': msg(u, id, body.tag, body.body); break;
+      case 'messages': { needAdmin(u); const b = String(body.body || '').trim(); if (!b && !body.photo) fail(400, 'Escribe un mensaje o adjunta una foto.'); const ev = body.photo ? addEvidence(u, t, body.photo, 'general', 'Envió una foto en el chat') : null; if (b) msg(u, id, b); save(); return { ok: true, evidence_id: ev }; }
       case 'confirm-dup': confirmDup(u, id); break;
       case 'resolve': { need(u, 'resolve'); const o = openT(id); if (o.owner_id !== u.id) fail(403, 'Toma el ticket para resolverlo.'); if (o.status === 'Dispose programado') fail(409, 'Este ticket está en Dispose programado; confirma la disposición con evidencia.'); const r = String(body.resolution || '').trim(); if (r.length < 8) fail(400, 'Escribe la resolución final (qué se hizo y dónde quedó el paquete).'); Object.assign(o, { status: 'Resuelto', resolution: r, resolved_at: now() }); event(o, u, 'resolucion', 'Resolvió: ' + r); break; }
-      case 'evidence': { needAdmin(u); const mm = String(body.data || '').match(/^data:([\w/+.-]+);base64,/); if (!mm || !/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(mm[1])) fail(400, 'Sube una foto (JPG, PNG, WEBP) o PDF.'); if (body.data.length > 6e6) fail(400, 'En la demo el archivo debe pesar menos de 4 MB.'); const e = { id: ++DB.evid, ticket_id: id, file_name: String(body.name || 'evidencia').slice(0, 80), mime: mm[1], purpose: body.purpose === 'dispose' ? 'dispose' : 'general', who: u.name, created_at: now(), data: body.data.length < 1.5e6 ? body.data : null }; DB.evidence.push(e); event(t, u, 'evidencia', 'Agregó evidencia: ' + e.file_name); save(); return { id: e.id }; }
+      case 'evidence': { needAdmin(u); const eid = addEvidence(u, t, { name: body.name, data: body.data }, body.purpose, body.purpose === 'dispose' ? 'Subió evidencia de disposición' : 'Agregó evidencia'); save(); return { id: eid }; }
       case 'dispose-done': { need(u, 'dispose'); if (t.status !== 'Dispose programado') fail(409, 'El ticket no está en Dispose programado.'); const e = DB.evidence.find(x => x.id === Number(body.evidence_id) && x.ticket_id === id && x.created_at >= t.dispose_scheduled_at); if (!e) fail(400, 'Sube la evidencia de la disposición antes de confirmarla.'); Object.assign(t, { status: 'Dispose realizado', dispose_done_at: now() }); event(t, u, 'dispose', 'Confirmó Dispose realizado con evidencia: ' + e.file_name); break; }
       case 'discard': { need(u, 'discard'); if (body.confirm !== true) fail(400, 'Falta la segunda confirmación.'); const r = String(body.reason || '').trim(); if (r.length < 10) fail(400, 'La justificación es obligatoria (mínimo 10 caracteres).'); if (t.status === 'Descartado') fail(409, 'Ya está descartado.'); Object.assign(t, { status_before_discard: t.status, status: 'Descartado', discarded_by: u.id, discarded_at: now(), discard_reason: r }); event(t, u, 'descarte', 'Descartó la incidencia: ' + r); break; }
       case 'restore': { need(u, 'restore'); if (t.status !== 'Descartado') fail(409, 'El ticket no está descartado.'); t.status = t.status_before_discard || 'Abierto'; event(t, u, 'descarte', 'Restauró la incidencia descartada'); break; }

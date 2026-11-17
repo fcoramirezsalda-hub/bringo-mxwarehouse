@@ -12,6 +12,7 @@ function createApp(db, opts = {}) {
   const EVID_DIR = opts.evidenceDir || path.join(DATA_DIR, 'evidencias');
   app.disable('x-powered-by');
   app.use(express.json({ limit: '12mb' }));
+  app.use((err, req, res, next) => { if (err && (err.type === 'entity.parse.failed' || err.type === 'entity.too.large')) return res.status(err.type === 'entity.too.large' ? 413 : 400).json({ error: err.type === 'entity.too.large' ? 'El archivo es demasiado grande.' : 'Solicitud no válida.' }); next(err); });
   app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); res.set('X-Frame-Options', 'DENY'); next(); });
 
   // ---------- Sesión ----------
@@ -116,7 +117,6 @@ function createApp(db, opts = {}) {
   act('transfer', (req, id) => dm.transfer(db, req.user, id, Number(req.body.to)));
   act('waiting', (req, id) => dm.setWaiting(db, req.user, id, req.body.dept));
   act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location));
-  act('messages', (req, id) => dm.addMessage(db, req.user, id, req.body.tag, req.body.body));
   act('confirm-dup', (req, id) => dm.confirmDup(db, req.user, id, now()));
   act('resolve', (req, id) => dm.resolve(db, req.user, id, req.body.resolution, now()));
   act('dispose-done', (req, id) => dm.disposeDone(db, req.user, id, Number(req.body.evidence_id), now()));
@@ -127,19 +127,34 @@ function createApp(db, opts = {}) {
 
   // Evidencias: se guardan en disco, nunca se borran desde la aplicación.
   const MIMES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'application/pdf': '.pdf' };
-  app.post('/api/tickets/:id/evidence', wrap(req => {
-    dm.needAdmin(req.user);
-    const id = Number(req.params.id); const t = db.prepare('SELECT id FROM tickets WHERE id=?').get(id); if (!t) dm.fail(404, 'No existe ese ticket.');
-    const m = String(req.body.data || '').match(/^data:([\w/+.-]+);base64,(.+)$/); if (!m || !MIMES[m[1]]) dm.fail(400, 'Sube una foto (JPG, PNG, WEBP) o PDF.');
+  function saveEvidence(user, id, file, purpose, label) {
+    const m = String((file && file.data) || '').match(/^data:([\w/+.-]+);base64,(.+)$/); if (!m || !MIMES[m[1]]) dm.fail(400, 'Sube una foto (JPG, PNG, WEBP) o PDF.');
     const buf = Buffer.from(m[2], 'base64'); if (buf.length > 8e6) dm.fail(400, 'El archivo pasa de 8 MB.');
     const stored = crypto.randomBytes(12).toString('hex') + MIMES[m[1]];
     fs.mkdirSync(path.join(EVID_DIR, String(id)), { recursive: true });
     fs.writeFileSync(path.join(EVID_DIR, String(id), stored), buf, { flag: 'wx' });
-    const name = String(req.body.name || 'evidencia').replace(/[^\w.\- áéíóúñÁÉÍÓÚÑ]/g, '').slice(0, 80) || 'evidencia';
-    const purpose = req.body.purpose === 'dispose' ? 'dispose' : 'general';
-    const r = db.prepare('INSERT INTO ticket_evidence (ticket_id, file_name, stored_as, mime, purpose, uploaded_by, created_at) VALUES (?,?,?,?,?,?,?)').run(id, name, stored, m[1], purpose, req.user.id, now());
-    dm.event(db, id, req.user, 'evidencia', 'Agregó evidencia: ' + name);
-    return { id: Number(r.lastInsertRowid) };
+    const name = String(file.name || 'foto').replace(/[^\w.\- áéíóúñÁÉÍÓÚÑ]/g, '').slice(0, 80) || 'foto';
+    const r = db.prepare('INSERT INTO ticket_evidence (ticket_id, file_name, stored_as, mime, purpose, uploaded_by, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(id, name, stored, m[1], purpose === 'dispose' ? 'dispose' : 'general', user.id, now());
+    dm.event(db, id, user, 'evidencia', label + ': ' + name);
+    return Number(r.lastInsertRowid);
+  }
+  const ticketOr404 = id => { const t = db.prepare('SELECT id FROM tickets WHERE id=?').get(id); if (!t) dm.fail(404, 'No existe ese ticket.'); return t; };
+  // Chat: texto, foto o ambos en un solo envío. La foto queda como evidencia del expediente.
+  app.post('/api/tickets/:id/messages', wrap(req => {
+    dm.needAdmin(req.user);
+    const id = Number(req.params.id); ticketOr404(id);
+    const body = String(req.body.body || '').trim(), photo = req.body.photo;
+    if (!body && !photo) dm.fail(400, 'Escribe un mensaje o adjunta una foto.');
+    const evidence_id = photo ? saveEvidence(req.user, id, photo, 'general', 'Envió una foto en el chat') : null;
+    if (body) dm.addMessage(db, req.user, id, body, now());
+    return { ok: true, evidence_id };
+  }));
+  // Evidencia sin mensaje (la usa la confirmación de Dispose).
+  app.post('/api/tickets/:id/evidence', wrap(req => {
+    dm.needAdmin(req.user);
+    const id = Number(req.params.id); ticketOr404(id);
+    return { id: saveEvidence(req.user, id, { name: req.body.name, data: req.body.data }, req.body.purpose, req.body.purpose === 'dispose' ? 'Subió evidencia de disposición' : 'Agregó evidencia') };
   }));
   app.get('/api/evidence/:id', (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).end();
