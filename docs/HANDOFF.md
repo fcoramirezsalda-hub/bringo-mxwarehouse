@@ -1,5 +1,12 @@
 # Handoff
 
+## 2026-11-17 (7) · Claude Code · propuesta de escaneo de retornos con detección y racks
+
+- Solo documentación: `docs/ADR-002-escaneo-retornos.md`. Sin cambios de código.
+- Se revisó en solo lectura el Apps Script "Escaneo Retornos — Eyoyo" y las pestañas Reglas, Catálogo, Referencia BrinGO y Modelo ML;
+  el algoritmo de detección queda documentado en el ADR para portarlo a Node.
+- Pendiente: respuestas del propietario (DECISIONS, pendiente 11) antes de crear tablas o escribir en la hoja.
+
 ## 2026-11-17 (6) · Claude Code · retornos escaneados integrados (apagado por defecto)
 
 - Se integró el ZIP de prueba de Codex (`BrinGO-prueba-retornos-Claude.zip`, base 60aecc1), revisado y depurado. Detalle y opciones: `docs/ADR-001-retornos.md`.

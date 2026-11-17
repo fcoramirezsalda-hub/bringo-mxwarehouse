@@ -37,4 +37,7 @@
 7. **Duplicado ES** con pantalla de selección de paquetería: ¿cuenta como "duplicado confirmado" desde que se reporta, o espera a que alguien lo confirme?
 8. **Regla de zonas** (≤ 5 kg y ≤ 60 cm → Zona 1): es un ejemplo. Hacen falta las tablas reales de tarifas.
 9. **Retornos:** ¿qué fuente real se usa? Recomendado: leer la hoja "Escaneo de Retornos" con una cuenta de servicio de solo lectura (ADR-001, opción B). La hoja no tiene rack ni estado; ¿se necesitan?
+11. **Escaneo de retornos en MX Wharehouse (ADR-002):** ¿se aprueba escanear en la plataforma y usar la hoja como espejo?
+    ¿Filas en Registro (con columna "Rack") o pestaña nueva? ¿Cuántos racks, cómo se asignan y si tienen etiqueta con código de barras?
+    ¿Quién corrige la paquetería detectada? ¿Se permite un Apps Script nuevo con token o una cuenta de servicio?
 10. **Motivos que se resuelven en piso** (Guía no reconocida, Extra Dept, No use label): con el registro de 3 clicks hoy abren ticket. ¿Deben registrarse directo como "Resuelto en piso" (solo historial)?
