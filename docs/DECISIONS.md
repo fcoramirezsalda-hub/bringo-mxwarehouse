@@ -35,6 +35,7 @@
 | 2026-11-17 | Usuarios se agregan y se dan de baja desde "Equipo y permisos" con perfiles fijos. La baja es lógica (no se borra): no puede entrar, sus tickets abiertos quedan sin responsable y se puede reactivar. Nadie se da de baja a sí mismo. | Propietario (pedido) · Claude Code (diseño) |
 | 2026-11-17 | Usuarios nuevos: Janneth en Customer Service (mismos permisos que Samantha, Pamela y Rachel) e Isaac como operador de Operación. | Propietario |
 | 2026-11-17 | Interfaz en español e inglés (botón ES/EN, también en el inicio de sesión), inicio de sesión y "Agregar persona" centrados, y diseño horizontal oscuro estilo Vuexy con opción a claro. Idioma y tema se guardan por PC; el historial y lo que escribe la gente no se traducen. Ver ADR-003. | Propietario (pedido) · Claude Code (diseño) |
+| 2026-11-18 | Los datos se guardan fuera de la carpeta del programa (Windows: `C:\ProgramData\MX Wharehouse\data`), con respaldo automático de la base al arrancar y cada 6 h (últimos 30), `npm run respaldo` y `actualizar.bat`. La primera vez se copian los datos de `app\data` sin borrarlos. La demo ya no cambia su clave de almacenamiento entre versiones. | Propietario (pedido: no perder datos al actualizar) · Claude Code (diseño) |
 
 ## Pendientes (requieren respuesta del propietario)
 

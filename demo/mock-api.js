@@ -4,7 +4,8 @@
    Los datos viven solo en este navegador (localStorage). PIN de prueba para todos: 1234. */
 (function () {
   'use strict';
-  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo-v5', PIN = '1234';
+  const H = 3600e3, D = 24 * H, KEY = 'mxw-demo', OLD_KEYS = ['mxw-demo-v5', 'mxw-demo-v4', 'mxw-demo-v3'], PIN = '1234';
+  // La clave NO cambia entre versiones: si cambian los datos base, se ajustan en upgrade() para no borrar lo que la gente ya registró.
   const TYPES = { inbound: 'Guía no reconocida', producto: 'Sin producto o diferente', danado: 'Dañado o con escurrimiento', extradept: 'Extra Dept', sinetiqueta: 'Sin etiqueta', nouse: 'No use label', duplicado: 'Duplicado', otro: 'Otro' };
   const PERMS = { take: 'Tomar ticket', transfer: 'Transferir / liberar tickets de otros', resolve: 'Resolver', confirmdup: 'Confirmar duplicado', discard: 'Descartar incidencia', restore: 'Restaurar descartada / reabrir resueltos de otros', dispose: 'Confirmar Dispose realizado', users: 'Administrar usuarios' };
   const DEPTS = ['Bringgo', 'EasyShip', 'Equipo turco', 'Vendedor Amazon', 'Murat (Laredo)', 'Customer Service', 'Procesamiento'];
@@ -49,8 +50,22 @@
   let DB;
   function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch {} }
   function load() {
-    try { const raw = localStorage.getItem(KEY); if (raw) { DB = JSON.parse(raw); return; } } catch {}
+    try {
+      for (const k of [KEY, ...OLD_KEYS]) {
+        const raw = localStorage.getItem(k);
+        if (raw) { DB = JSON.parse(raw); upgrade(); if (k !== KEY) save(); return; }
+      }
+    } catch {}
     seed();
+  }
+  // Datos guardados por versiones anteriores: se completan sin borrar nada.
+  function upgrade() {
+    for (const k of ['tickets', 'events', 'messages', 'evidence', 'jobs', 'users']) DB[k] = DB[k] || [];
+    for (const u of DB.users) if (u.active === undefined) u.active = 1;
+    for (const [name, role, dept, title, perms] of TEAM) {
+      if (DB.users.some(u => nn(u.name) === nn(name))) continue;
+      DB.users.push({ id: Math.max(0, ...DB.users.map(x => x.id)) + 1, name, role, dept, title, perms, active: 1 });
+    }
   }
   function seed() {
     const t0 = now();
@@ -281,5 +296,5 @@
     catch (e) { status = e.status || 500; out = { error: e.message || 'Error' }; if (!e.status) console.error(e); }
     return new Response(JSON.stringify(out), { status, headers: { 'Content-Type': 'application/json' } });
   };
-  window.mxwDemoReset = () => { try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY + '-uid'); } catch {} location.reload(); };
+  window.mxwDemoReset = () => { try { [KEY, ...OLD_KEYS].forEach(k => localStorage.removeItem(k)); sessionStorage.removeItem(KEY + '-uid'); } catch {} location.reload(); };
 })();

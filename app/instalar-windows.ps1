@@ -2,6 +2,7 @@
 # Uso: clic derecho en "instalar-windows.bat" → Ejecutar como administrador
 #      (sin administrador también funciona, pero no abre el firewall ni ajusta la suspensión).
 # Es seguro correrlo varias veces: no borra datos ni cambia los PIN existentes.
+# Los datos viven en C:\ProgramData\MX Wharehouse, fuera de esta carpeta.
 
 $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
@@ -39,12 +40,19 @@ else {
 }
 
 Paso '3/7 Base de datos y usuarios'
-if (Test-Path 'data\incidencias.db') { Ok 'Ya existe; no se cambió nada.' }
+# Los datos viven fuera de esta carpeta (C:\ProgramData\MX Wharehouse): actualizar o reemplazar el programa no los borra.
+$datos = (node --no-warnings -e "console.log(require('./src/db').DATA_DIR)").Trim()
+$base = Split-Path $datos -Parent
+New-Item -ItemType Directory -Force -Path $datos | Out-Null
+if (Test-Path (Join-Path $datos 'incidencias.db')) { Ok "Ya existe en $datos; no se cambió nada." }
 else {
   npm run setup
   Aviso 'Anota los PIN de arriba y entrégalos en persona. No se vuelven a mostrar.'
   Read-Host 'Presiona Enter cuando los hayas anotado'
 }
+# El servidor corre con el usuario normal: debe poder escribir en la carpeta de datos aunque este instalador sea administrador.
+if ($admin) { icacls "$base" /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null }
+Ok "Datos en $datos · respaldos automáticos en $(Join-Path $base 'respaldos')"
 
 Paso '4/7 Arranque automático al iniciar sesión'
 foreach ($n in @(@{Nombre='MX Wharehouse - Servidor'; Bat='iniciar-servidor.bat'}, @{Nombre='MX Wharehouse - Agente'; Bat='iniciar-agente.bat'})) {
@@ -69,7 +77,8 @@ if ($admin) {
 }
 
 Paso '6/7 Sesión de Bringgo y EasyShip para el agente'
-if (Test-Path 'perfil-agente') { Ok 'Ya hay una sesión guardada (carpeta perfil-agente). Si vence, corre: npm run agent:login' }
+$perfil = (node --no-warnings -e "console.log(require('./src/db').agentProfile())").Trim()
+if (Test-Path $perfil) { Ok "Ya hay una sesión guardada ($perfil). Si vence, corre: npm run agent:login" }
 else {
   Write-Host '  Ahora se abrirá Microsoft Edge con Bringgo y EasyShip. Inicia sesión en los dos y luego CIERRA la ventana de Edge.'
   Write-Host '  (El instalador espera aquí hasta que cierres esa ventana.)'
@@ -79,7 +88,7 @@ else {
 
 Paso '7/7 Arrancar ahora y comprobar'
 Get-ScheduledTask -TaskName 'MX Wharehouse - Servidor' | Start-ScheduledTask
-if (Test-Path 'perfil-agente') { Get-ScheduledTask -TaskName 'MX Wharehouse - Agente' | Start-ScheduledTask }
+if (Test-Path $perfil) { Get-ScheduledTask -TaskName 'MX Wharehouse - Agente' | Start-ScheduledTask }
 Write-Host '  Se abren ventanas negras del servidor y del agente: déjalas abiertas (puedes minimizarlas).'
 $arriba = $false
 foreach ($i in 1..30) {

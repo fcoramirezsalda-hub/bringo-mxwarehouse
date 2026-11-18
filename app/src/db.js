@@ -3,8 +3,46 @@ const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const os = require('os');
+
+// Los datos viven FUERA de la carpeta del programa, para que actualizar o reemplazar el código
+// (git pull, bajar un ZIP nuevo, reinstalar) nunca los borre.
+//   Windows: C:\ProgramData\MX Wharehouse\{data, respaldos, perfil-agente}
+//   Otros:   ~/.mx-wharehouse/{data, respaldos, perfil-agente}
+// DATA_DIR (variable de entorno) sigue mandando si está definida.
+const BASE_DIR = process.env.DATA_DIR ? path.dirname(path.resolve(process.env.DATA_DIR))
+  : process.platform === 'win32' ? path.join(process.env.ProgramData || 'C:\\ProgramData', 'MX Wharehouse')
+  : path.join(os.homedir(), '.mx-wharehouse');
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(BASE_DIR, 'data');
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(BASE_DIR, 'respaldos');
+const LEGACY_DATA = path.join(__dirname, '..', 'data'); // ubicación anterior (dentro del programa, hasta v0.8.0)
+const LEGACY_PROFILE = path.join(__dirname, '..', 'perfil-agente');
 const H = 3600e3, D = 24 * H;
+
+// Copia (no mueve ni borra) los datos de la ubicación anterior la primera vez que corre esta versión.
+function migrateLegacy(from = LEGACY_DATA, to = DATA_DIR) {
+  try {
+    if (!fs.existsSync(path.join(from, 'incidencias.db')) || fs.existsSync(path.join(to, 'incidencias.db'))) return false;
+    fs.mkdirSync(to, { recursive: true });
+    fs.cpSync(from, to, { recursive: true, force: false });
+    fs.writeFileSync(path.join(from, 'LEEME-DATOS-MOVIDOS.txt'),
+      `Desde la v0.9.0 los datos se usan en:\r\n  ${to}\r\nEsta carpeta es la copia anterior; ya no se actualiza. No la borres hasta comprobar que todo está en la nueva ubicación.\r\n`);
+    console.error('Datos copiados de ' + from + ' a ' + to);
+    return true;
+  } catch (e) { console.error('No se pudieron copiar los datos anteriores: ' + e.message); return false; }
+}
+if (!process.env.DATA_DIR) migrateLegacy();
+
+// Perfil del navegador del agente (sesión de Bringgo/EasyShip): también fuera del programa.
+function agentProfile() {
+  if (process.env.AGENT_PROFILE) return process.env.AGENT_PROFILE;
+  const p = path.join(BASE_DIR, 'perfil-agente');
+  if (!fs.existsSync(p) && fs.existsSync(LEGACY_PROFILE)) {
+    try { fs.cpSync(LEGACY_PROFILE, p, { recursive: true }); }
+    catch (e) { console.error('No se pudo copiar el perfil del agente; se usa el anterior: ' + e.message); return LEGACY_PROFILE; }
+  }
+  return p;
+}
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -115,6 +153,20 @@ function open(file) {
   return db;
 }
 
+// Respaldo en caliente de la base (VACUUM INTO: copia consistente aunque el servidor esté trabajando).
+// Guarda los últimos KEEP respaldos. Las evidencias (fotos) no entran: viven en data\\evidencias.
+function backup(db, { dir = BACKUP_DIR, keep = 30, now = new Date() } = {}) {
+  fs.mkdirSync(dir, { recursive: true });
+  const p2 = n => String(n).padStart(2, '0');
+  const name = `incidencias-${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}_${p2(now.getHours())}${p2(now.getMinutes())}${p2(now.getSeconds())}.db`;
+  const file = path.join(dir, name);
+  if (fs.existsSync(file)) return file;
+  db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+  const old = fs.readdirSync(dir).filter(f => /^incidencias-.*\.db$/.test(f)).sort().reverse().slice(keep);
+  for (const f of old) fs.unlinkSync(path.join(dir, f)); // solo copias de respaldo viejas, nunca la base
+  return file;
+}
+
 // Transacción simple (node:sqlite no trae helper).
 function tx(db, fn) {
   db.exec('BEGIN IMMEDIATE');
@@ -122,4 +174,4 @@ function tx(db, fn) {
   catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
-module.exports = { open, tx, DATA_DIR, H, D };
+module.exports = { open, tx, backup, agentProfile, migrateLegacy, DATA_DIR, BASE_DIR, BACKUP_DIR, H, D };

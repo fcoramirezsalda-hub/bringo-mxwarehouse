@@ -1,5 +1,17 @@
 # Handoff
 
+## 2026-11-18 · Claude Code · los datos ya no se pierden al actualizar (v0.9.0)
+
+- **Problema:** el propietario perdió los datos al reiniciar tras actualizar. El servidor no borra nada al reiniciar; la base vivía en `app\data`,
+  dentro de la carpeta del programa, y se pierde si esa carpeta se reemplaza (ZIP nuevo, reinstalar, carpeta nueva). En la demo, cada versión cambiaba la clave de `localStorage` (v3 → v5) y empezaba de cero.
+- **Cambio:** `src/db.js` usa `C:\ProgramData\MX Wharehouse\{data,respaldos,perfil-agente}` (Linux/mac: `~/.mx-wharehouse`); `DATA_DIR` sigue mandando.
+  Al arrancar copia `app\data` a la nueva ubicación si ahí no hay base (no borra el original; deja `LEEME-DATOS-MOVIDOS.txt`). Igual con `perfil-agente`.
+- Respaldo con `VACUUM INTO` al arrancar el servidor y cada 6 h (últimos 30); `npm run respaldo`; `npm run datos` muestra la carpeta.
+- `actualizar.bat`: respaldo → `git pull` → `npm install`. El instalador busca la base en la nueva carpeta y da permiso de escritura a Usuarios (icacls) si corre como administrador.
+- Demo: clave fija `mxw-demo`; si encuentra `mxw-demo-v5/v4/v3` los carga y completa (`upgrade()`). "Reiniciar datos" borra todas.
+- **Pruebas:** `npm test` 37/37 (nuevas: datos fuera del programa, migración sin borrar ni pisar, respaldo con rotación). Servidor real con `app/data` de prueba: copió los datos, respondió con los usuarios y creó el respaldo. Demo: datos con clave v3 se conservan y se agregan Janneth e Isaac.
+- **Falta:** probar el instalador y `actualizar.bat` en la PC con Windows; republicar la demo; recuperar los datos perdidos si existe la carpeta anterior o la copia en Google Sheets.
+
 ## 2026-11-17 (12) · Claude Code · idioma ES/EN, login centrado y diseño horizontal oscuro/claro (v0.8.0)
 
 - **Idioma:** botón ES/EN en la barra superior y en el inicio de sesión. `app/public/i18n.js` traduce en pantalla lo que pinta app.js

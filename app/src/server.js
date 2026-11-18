@@ -3,7 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { open, DATA_DIR, H, D } = require('./db');
+const { open, backup, DATA_DIR, BACKUP_DIR, H, D } = require('./db');
 const dm = require('./domain');
 
 function createApp(db, opts = {}) {
@@ -235,10 +235,14 @@ if (require.main === module) {
     // Los procesos de fondo arrancan solo si este servidor quedó escuchando (evita dos copias trabajando a la vez).
     setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
     dm.runDeadlines(db);
+    // Respaldo automático al arrancar y cada 6 horas (últimos 30) en la carpeta "respaldos".
+    const respaldo = () => { try { backup(db); } catch (e) { console.error('Respaldo:', e.message); } };
+    respaldo(); setInterval(respaldo, 6 * H);
     require('./sheets-sync').start(db);
     if (require('./retornos-escaneo').enabled()) require('./retornos-escaneo').start(db);
     const ips = Object.values(require('os').networkInterfaces()).flat().filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
     console.log(`MX Wharehouse · incidencias en http://localhost:${port}`);
+    console.log(`  Datos: ${DATA_DIR}  ·  Respaldos: ${BACKUP_DIR}`);
     ips.forEach(ip => console.log(`  En la red de la bodega: http://${ip}:${port}`));
   });
   server.on('error', e => {

@@ -1,6 +1,6 @@
 {
   "name": "mx-wharehouse-incidencias",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "MVP de incidencias de registro (MX Wharehouse): tickets, panel de Victor y CS, agente de búsqueda en Bringgo/EasyShip",
   "engines": {
@@ -13,7 +13,9 @@
     "agent:login": "node --no-warnings src/worker.js --login",
     "sheets:setup": "node --no-warnings src/sheets-sync.js",
     "retornos:setup": "node --no-warnings src/retornos-escaneo.js",
-    "test": "node --no-warnings --test test/api.test.js test/sheets.test.js test/returns.test.js test/guias.test.js test/retornos-escaneo.test.js"
+    "test": "node --no-warnings --test test/api.test.js test/sheets.test.js test/returns.test.js test/guias.test.js test/retornos-escaneo.test.js test/datos.test.js",
+    "respaldo": "node --no-warnings src/respaldo.js",
+    "datos": "node --no-warnings -e \"const d=require('./src/db');console.log(d.DATA_DIR)\""
   },
   "dependencies": {
     "express": "4.21.2",
