@@ -24,9 +24,11 @@ function claim(db, now = Date.now()) {
 
 function finish(db, job, result, now = Date.now()) {
   const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(job.ticket_id);
-  if (!t) return;
+  if (!t) return false;
   db.exec('BEGIN IMMEDIATE');
   try {
+    // Si el trabajo se canceló mientras se buscaba (alguien pidió nueva búsqueda), el resultado ya no vale: no se escribe nada.
+    if (!db.prepare("UPDATE enrichment_jobs SET status='done', error=NULL, updated_at=? WHERE id=? AND status='running'").run(now, job.id).changes) { db.exec('ROLLBACK'); return false; }
     if (result.none) {
       db.prepare("UPDATE tickets SET enr_status='sin', enr_source=NULL, enr_data=?, enr_at=? WHERE id=?").run(JSON.stringify({ tried: result.tried }), now, t.id);
       dm.event(db, t.id, null, 'agente', 'Agente de búsqueda: sin coincidencias en ' + result.tried.join(', '), now);
@@ -39,17 +41,18 @@ function finish(db, job, result, now = Date.now()) {
       if (code && dm.isBare(t.code) && t.code !== code) dm.event(db, t.id, null, 'agente', `Agente de búsqueda: el número ${t.code} es ${code}`, now);
       dm.event(db, t.id, null, 'agente', `Agente de búsqueda: información obtenida de ${result.source}${data.candidates.length ? ` (${data.candidates.length} resultados; confirmar cuál)` : ''}`, now);
     }
-    db.prepare("UPDATE enrichment_jobs SET status='done', error=NULL, updated_at=? WHERE id=?").run(now, job.id);
     db.exec('COMMIT');
+    return true;
   } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
 function failJob(db, job, err, now = Date.now()) {
   const wait = dm.RETRY_MIN[job.attempts - 1];
+  // Solo si sigue "running": un trabajo cancelado (nueva búsqueda) no se revive ni marca error en el ticket.
   if (wait !== undefined && job.attempts < 3) {
-    db.prepare("UPDATE enrichment_jobs SET status='pending', next_at=?, locked_at=NULL, error=?, updated_at=? WHERE id=?").run(now + wait * 60e3, String(err).slice(0, 500), now, job.id);
+    db.prepare("UPDATE enrichment_jobs SET status='pending', next_at=?, locked_at=NULL, error=?, updated_at=? WHERE id=? AND status='running'").run(now + wait * 60e3, String(err).slice(0, 500), now, job.id);
   } else {
-    db.prepare("UPDATE enrichment_jobs SET status='failed', error=?, updated_at=? WHERE id=?").run(String(err).slice(0, 500), now, job.id);
+    if (!db.prepare("UPDATE enrichment_jobs SET status='failed', error=?, updated_at=? WHERE id=? AND status='running'").run(String(err).slice(0, 500), now, job.id).changes) return;
     db.prepare("UPDATE tickets SET enr_status='error', enr_at=? WHERE id=?").run(now, job.ticket_id);
     dm.event(db, job.ticket_id, null, 'agente', 'Agente de búsqueda: no se pudo consultar después de 3 intentos', now);
   }
@@ -80,8 +83,11 @@ async function processOne(db, page, lookupFn) {
     console.log(`[${new Date().toLocaleTimeString()}] ${dm.folio(job.ticket_id)} ${r.none ? 'sin coincidencias' : r.source} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   } catch (e) {
     console.error(`[${new Date().toLocaleTimeString()}] ${dm.folio(job.ticket_id)} error: ${e.message}`);
-    if (page && !FAKE) { const c = require('./connectors'); const f = await c.evidence(page, CAPTURES, dm.folio(job.ticket_id)); if (f) console.error('  Captura para revisar: ' + f + '.png (contiene datos de clientes)'); }
-    failJob(db, job, e.message);
+    failJob(db, job, e.message); // primero: el trabajo queda registrado aunque la captura falle
+    if (page && !FAKE) {
+      try { const f = await require('./connectors').evidence(page, CAPTURES, dm.folio(job.ticket_id)); if (f) console.error('  Captura para revisar: ' + f + '.png (contiene datos de clientes)'); }
+      catch (ce) { console.error('  No se pudo guardar la captura: ' + ce.message); }
+    }
     if (e.name === 'SessionExpired' || /sesión venció/.test(e.message)) { heartbeat(db, 'Sesión vencida en Bringgo/EasyShip'); throw e; }
   }
   return true;

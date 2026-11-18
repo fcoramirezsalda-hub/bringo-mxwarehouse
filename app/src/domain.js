@@ -133,41 +133,41 @@ function needManage(db, user, t) {
   fail(403, 'Solo el responsable o alguien con permiso de transferir puede hacer esto.');
 }
 
-function release(db, user, id) {
+function release(db, user, id, now = Date.now()) {
   return tx(db, () => {
     const t = getOpen(db, id); if (!t.owner_id) fail(409, 'El ticket no tiene responsable.');
     needManage(db, user, t);
     const prev = db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id).name;
     db.prepare(`UPDATE tickets SET owner_id=NULL, status=CASE WHEN status='En gestión' THEN 'Abierto' ELSE status END, version=version+1 WHERE id=?`).run(id);
-    event(db, id, user, 'asignacion', `Liberó el ticket (responsable anterior: ${prev})`);
+    event(db, id, user, 'asignacion', `Liberó el ticket (responsable anterior: ${prev})`, now);
   });
 }
-function transfer(db, user, id, toId) {
+function transfer(db, user, id, toId, now = Date.now()) {
   return tx(db, () => {
     const t = getOpen(db, id); needManage(db, user, t);
     const to = db.prepare("SELECT * FROM users WHERE id=? AND role='admin' AND active=1").get(toId);
     if (!to) fail(400, 'Elige a una persona de Procesamiento o Customer Service.');
     const prev = t.owner_id ? db.prepare('SELECT name FROM users WHERE id=?').get(t.owner_id).name : 'sin responsable';
     db.prepare(`UPDATE tickets SET owner_id=?, status=CASE WHEN status='Abierto' THEN 'En gestión' ELSE status END, version=version+1 WHERE id=?`).run(to.id, id);
-    event(db, id, user, 'asignacion', `Transfirió de ${prev} a ${to.name}`);
+    event(db, id, user, 'asignacion', `Transfirió de ${prev} a ${to.name}`, now);
   });
 }
-function setWaiting(db, user, id, dept) {
+function setWaiting(db, user, id, dept, now = Date.now()) {
   return tx(db, () => {
     const t = getOpen(db, id); needManage(db, user, t);
     const d = dept ? String(dept) : null;
     if (d && !DEPTS.includes(d)) fail(400, 'Departamento no válido.');
     const st = d ? 'Esperando respuesta' : (t.owner_id ? 'En gestión' : 'Abierto');
     db.prepare('UPDATE tickets SET waiting_dept=?, status=CASE WHEN status=\'Dispose programado\' THEN status ELSE ? END, version=version+1 WHERE id=?').run(d, st, id);
-    event(db, id, user, 'espera', d ? `Esperando respuesta de ${d}` : 'Ya no se espera respuesta de otro departamento');
+    event(db, id, user, 'espera', d ? `Esperando respuesta de ${d}` : 'Ya no se espera respuesta de otro departamento', now);
   });
 }
-function setLocation(db, user, id, loc) {
+function setLocation(db, user, id, loc, now = Date.now()) {
   return tx(db, () => {
     const t = getOpen(db, id); needManage(db, user, t);
     const v = String(loc || '').trim().slice(0, 120);
     db.prepare('UPDATE tickets SET location=?, version=version+1 WHERE id=?').run(v || null, id);
-    event(db, id, user, 'ubicacion', 'Ubicación física: ' + (v || 'sin registrar'));
+    event(db, id, user, 'ubicacion', 'Ubicación física: ' + (v || 'sin registrar'), now);
   });
 }
 function addMessage(db, user, id, body, now = Date.now()) {
@@ -231,6 +231,13 @@ function resolverOf(db, id) {
   const e = db.prepare("SELECT actor_id FROM ticket_events WHERE ticket_id=? AND kind='resolucion' ORDER BY created_at DESC, id DESC LIMIT 1").get(id);
   return e ? e.actor_id : null;
 }
+// Quién resolvió cada ticket de una lista, en una sola consulta (evita una consulta por fila en la bandeja).
+function resolversOf(db, ids) {
+  if (!ids.length) return {};
+  const rows = db.prepare(`SELECT e.ticket_id, e.actor_id FROM ticket_events e WHERE e.kind='resolucion' AND e.ticket_id IN (SELECT value FROM json_each(?))
+    AND e.id = (SELECT x.id FROM ticket_events x WHERE x.ticket_id=e.ticket_id AND x.kind='resolucion' ORDER BY x.created_at DESC, x.id DESC LIMIT 1)`).all(JSON.stringify(ids));
+  return Object.fromEntries(rows.map(r => [r.ticket_id, r.actor_id]));
+}
 // Reabrir un ticket resuelto (p. ej. "Resuelto" pulsado por error). Puede quien lo resolvió o quien tiene permiso de restaurar.
 // No borra nada: la resolución anterior queda en el historial.
 function reopen(db, user, id, now = Date.now()) {
@@ -240,9 +247,13 @@ function reopen(db, user, id, now = Date.now()) {
     if (!t) fail(404, 'No existe ese ticket.');
     if (t.status !== 'Resuelto') fail(409, 'Solo se pueden reabrir tickets resueltos.');
     if (resolverOf(db, id) !== user.id && !can(user, 'restore')) fail(403, 'Solo quien lo resolvió o alguien con permiso de restaurar puede reabrirlo.');
-    const st = t.waiting_dept ? 'Esperando respuesta' : t.owner_id ? 'En gestión' : 'Abierto';
-    const r = db.prepare("UPDATE tickets SET status=?, resolution=NULL, resolved_at=NULL, version=version+1 WHERE id=? AND version=? AND status='Resuelto'").run(st, id, t.version);
+    // Si el responsable fue dado de baja mientras estaba resuelto, el ticket vuelve sin responsable (nadie podría tomarlo).
+    const owner = t.owner_id ? db.prepare('SELECT name, active FROM users WHERE id=?').get(t.owner_id) : null;
+    const ownerId = owner && owner.active ? t.owner_id : null;
+    const st = t.waiting_dept ? 'Esperando respuesta' : ownerId ? 'En gestión' : 'Abierto';
+    const r = db.prepare("UPDATE tickets SET status=?, owner_id=?, resolution=NULL, resolved_at=NULL, version=version+1 WHERE id=? AND version=? AND status='Resuelto'").run(st, ownerId, id, t.version);
     if (!r.changes) fail(409, 'El ticket cambió hace un instante; vuelve a intentarlo.');
+    if (owner && !ownerId) event(db, id, user, 'asignacion', `Ticket liberado: ${owner.name} está dado de baja`, now);
     event(db, id, user, 'resolucion', `Reabrió el ticket (resolución anterior: ${t.resolution || '—'})`, now);
     return { id, folio: folio(id), status: st };
   });
@@ -271,32 +282,35 @@ function discard(db, user, id, reason, confirmed, now = Date.now()) {
     event(db, id, user, 'descarte', 'Descartó la incidencia: ' + r, now);
   });
 }
-function restore(db, user, id) {
+function restore(db, user, id, now = Date.now()) {
   need(user, 'restore');
   return tx(db, () => {
     const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id);
     if (!t || t.status !== 'Descartado') fail(409, 'El ticket no está descartado.');
     db.prepare('UPDATE tickets SET status=COALESCE(status_before_discard,\'Abierto\'), version=version+1 WHERE id=?').run(id);
-    event(db, id, user, 'descarte', 'Restauró la incidencia descartada');
+    event(db, id, user, 'descarte', 'Restauró la incidencia descartada', now);
   });
 }
-function setDamageOutcome(db, user, id, outcome, by = null) {
+function setDamageOutcome(db, user, id, outcome, by = null, now = Date.now()) {
   if (user) needAdmin(user);
   if (!DAMAGE_OUTCOMES.includes(outcome)) fail(400, 'Desenlace no válido.');
   const t = db.prepare("SELECT * FROM tickets WHERE id=? AND type='danado'").get(id);
   if (!t) fail(404, 'No es un envío dañado.');
   db.prepare('UPDATE tickets SET damage_outcome=?, version=version+1 WHERE id=?').run(outcome, id);
-  event(db, id, user, 'danado', 'Desenlace del envío dañado: ' + outcome + (by ? ' · ' + by : ''));
+  event(db, id, user, 'danado', 'Desenlace del envío dañado: ' + outcome + (by ? ' · ' + by : ''), now);
 }
-function research(db, user, id, value) {
+function research(db, user, id, value, now = Date.now()) {
   needAdmin(user);
-  const t = db.prepare('SELECT * FROM tickets WHERE id=?').get(id); if (!t) fail(404, 'No existe ese ticket.');
   const v = String(value || '').trim(); if (!v) fail(400, 'Escribe un MX/ES o una guía.');
   const c = parseCode(v);
-  if (c) db.prepare('UPDATE tickets SET code=?, plat=? WHERE id=?').run(c, platOf(c), id);
-  else db.prepare('UPDATE tickets SET trk=? WHERE id=?').run(v.replace(/\s+/g, '').slice(0, 60), id);
-  event(db, id, user, 'agente', 'Pidió nueva búsqueda con ' + v);
-  enqueue(db, db.prepare('SELECT * FROM tickets WHERE id=?').get(id));
+  // En una sola transacción y con version+1: quien tenga el ticket abierto en otra pantalla detecta el cambio.
+  return tx(db, () => {
+    const t = db.prepare('SELECT id FROM tickets WHERE id=?').get(id); if (!t) fail(404, 'No existe ese ticket.');
+    if (c) db.prepare('UPDATE tickets SET code=?, plat=?, version=version+1 WHERE id=?').run(c, platOf(c), id);
+    else db.prepare('UPDATE tickets SET trk=?, version=version+1 WHERE id=?').run(v.replace(/\s+/g, '').slice(0, 60), id);
+    event(db, id, user, 'agente', 'Pidió nueva búsqueda con ' + v, now);
+    enqueue(db, db.prepare('SELECT * FROM tickets WHERE id=?').get(id), now);
+  });
 }
 
 // ---------- Usuarios ----------
@@ -366,5 +380,5 @@ function runDeadlines(db, now = Date.now()) {
 
 module.exports = { TYPES, PERMS, DEPTS, MSG_TAGS, DAMAGE_OUTCOMES, CLOSED, RETRY_MIN, HttpError, fail, normCode, parseCode, isBare, platOf, codeKeys, folio, isOpenSql,
   permsOf, can, need, needAdmin, event, enqueue, createIncident, take, release, transfer, setWaiting, setLocation, addMessage,
-  confirmDup, resolve, quickResolve, QUICK_TEXT, reopen, resolverOf, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines,
+  confirmDup, resolve, quickResolve, QUICK_TEXT, reopen, resolverOf, resolversOf, disposeDone, discard, restore, setDamageOutcome, research, runDeadlines,
   PROFILES, normName, findByName, createUser, setUserActive, H, D };

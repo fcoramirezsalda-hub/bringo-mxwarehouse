@@ -77,3 +77,9 @@ Estados: `pendiente` · `en curso` · `hecho` · `bloqueado`. Un archivo o módu
 | P.2 | Prototipo de tickets, plazos, duplicados, descartes y retornos | Claude Code | 2026-11-15 |
 | P.3 | Documentos compartidos (este archivo y los de `docs/`) | Claude Code | 2026-11-15 |
 | P.4 | Prototipo enfocado en registro de incidencias (escanear o teclear MX/ES, motivo, acción, evidencia) y equipo de CS real | Claude Code | 2026-11-15 |
+
+## Mantenimiento
+
+| # | Tarea | Responsable | Estado |
+|---|---|---|---|
+| M.1 | Revisión de código por apartado y corrección de 10 fallas (agente, sesión, Sheets, reabrir, retornos anulados, rendimiento de la bandeja) | Claude Code | hecho 2026-11-18 (v0.9.1) |

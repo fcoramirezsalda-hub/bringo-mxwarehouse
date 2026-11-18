@@ -102,11 +102,19 @@ function scan(db, user, body, now) {
   const notes = String((body && body.notes) || '').trim().slice(0, 300) || null;
   return tx(db, () => {
     const mine = db.prepare('SELECT s.*, u.name op FROM return_scans s JOIN users u ON u.id=s.operator_id WHERE s.dup_key=?').get(key);
-    if (mine) dm.fail(409, `Guía repetida: ya la escaneó ${mine.op} el ${fmt(mine.created_at)}${mine.status === 'anulado' ? ' (anulado)' : ''}. No se registró otra vez.`);
-    const inSheet = db.prepare('SELECT * FROM sheet_registro WHERE dup_key=?').get(key);
+    if (mine && mine.status !== 'anulado') dm.fail(409, `Guía repetida: ya la escaneó ${mine.op} el ${fmt(mine.created_at)}. No se registró otra vez.`);
+    const inSheet = !mine && db.prepare('SELECT * FROM sheet_registro WHERE dup_key=?').get(key);
     if (inSheet) dm.fail(409, `Guía repetida: ya está en la hoja "Escaneo de Retornos"${inSheet.row ? ' (fila ' + inSheet.row + ')' : ''}. No se registró otra vez.`);
     const r = G.identify(guide, detector(db));
     const rack = rackFor(db, r.carrier);
+    // Escaneo anulado: se vuelve a registrar en la MISMA fila (dup_key es único; no se borra nada y el historial lo conserva).
+    if (mine) {
+      db.prepare(`UPDATE return_scans SET guide_raw=?, guide=?, carrier=?, method=?, rack_id=?, notes=?, operator_id=?, status='registrado', created_at=?, updated_at=?,
+        sheet_update=MAX(sheet_update, ?), sheet_status=CASE WHEN sheet_status='duplicado' THEN sheet_status ELSE 'pendiente' END WHERE id=?`)
+        .run(raw, guide, r.carrier, r.method, rack, notes, user.id, now, now, dirty(mine), mine.id);
+      event(db, mine.id, user, 'escaneo', `Escaneó de nuevo ${guide} (estaba anulado: ${mine.notes || 'sin nota'}) · ${r.carrier} (${r.method})`, now);
+      return getScan(db, mine.id);
+    }
     const id = Number(db.prepare(`INSERT INTO return_scans (guide_raw, guide, dup_key, carrier, method, rack_id, notes, operator_id, created_at, updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?)`).run(raw, guide, key, r.carrier, r.method, rack, notes, user.id, now, now).lastInsertRowid);
     event(db, id, user, 'escaneo', `Escaneó ${guide} · ${r.carrier} (${r.method})`, now);

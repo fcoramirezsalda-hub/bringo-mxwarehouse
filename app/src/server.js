@@ -6,6 +6,12 @@ const path = require('path');
 const { open, backup, DATA_DIR, BACKUP_DIR, H, D } = require('./db');
 const dm = require('./domain');
 
+// Limpieza: sesiones vencidas e intentos fallidos viejos (más de un día).
+function purgeSessions(db, t = Date.now()) {
+  db.prepare('DELETE FROM sessions WHERE expires_at<=?').run(t);
+  db.prepare('DELETE FROM login_failures WHERE last_at<?').run(t - D);
+}
+
 function createApp(db, opts = {}) {
   const app = express();
   const now = opts.now || (() => Date.now());
@@ -17,7 +23,9 @@ function createApp(db, opts = {}) {
 
   // ---------- Sesión ----------
   const { hashPin, checkPin, newPin } = require('./pin');
-  const cookie = req => Object.fromEntries((req.headers.cookie || '').split(';').map(c => c.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
+  // Una cookie mal codificada (de otro programa en la misma PC o IP) no debe tumbar la sesión: se deja sin decodificar.
+  const dec = v => { try { return decodeURIComponent(v); } catch { return v; } };
+  const cookie = req => Object.fromEntries((req.headers.cookie || '').split(';').map(c => c.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, dec(v.join('='))]));
 
   function auth(req, res, next) {
     const tok = cookie(req).sid;
@@ -39,7 +47,8 @@ function createApp(db, opts = {}) {
     if (f && f.count >= 5 && now() - f.last_at < 60e3) dm.fail(429, 'Demasiados intentos. Espera un minuto.');
     const u = db.prepare('SELECT * FROM users WHERE name=? AND active=1').get(name);
     if (!u || !checkPin(pin, u.pin_hash)) {
-      db.prepare('INSERT INTO login_failures (name, count, last_at) VALUES (?,1,?) ON CONFLICT(name) DO UPDATE SET count=count+1, last_at=excluded.last_at').run(name, now());
+      // Solo se cuentan intentos de usuarios que existen: nombres inventados no llenan la tabla.
+      if (u) db.prepare('INSERT INTO login_failures (name, count, last_at) VALUES (?,1,?) ON CONFLICT(name) DO UPDATE SET count=count+1, last_at=excluded.last_at').run(name, now());
       dm.fail(401, 'Usuario o PIN incorrecto.');
     }
     db.prepare('DELETE FROM login_failures WHERE name=?').run(name);
@@ -58,7 +67,7 @@ function createApp(db, opts = {}) {
 
   // ---------- Serialización ----------
   const names = () => Object.fromEntries(db.prepare('SELECT id, name FROM users').all().map(u => [u.id, u.name]));
-  function row(t, N = names()) {
+  function row(t, N = names(), R = null) {
     const due = t.dup_due_at || t.due_at;
     return { id: t.id, folio: dm.folio(t.id), code: t.code, trk: t.trk, plat: t.plat, nolabel: !!t.nolabel, type: t.type, type_label: dm.TYPES[t.type],
       other_text: t.other_text, description: t.description, status: t.status, open: !dm.CLOSED.includes(t.status),
@@ -67,9 +76,12 @@ function createApp(db, opts = {}) {
       dup_confirmed_by: t.dup_confirmed_by ? N[t.dup_confirmed_by] : null, dup_confirmed_at: t.dup_confirmed_at, dup_due_at: t.dup_due_at,
       resolution: t.resolution, resolved_at: t.resolved_at, discarded_by: t.discarded_by ? N[t.discarded_by] : null, discarded_at: t.discarded_at,
       discard_reason: t.discard_reason, dispose_scheduled_at: t.dispose_scheduled_at, dispose_done_at: t.dispose_done_at,
-      resolved_by_id: t.status === 'Resuelto' ? dm.resolverOf(db, t.id) : null,
+      resolved_by_id: t.status === 'Resuelto' ? (R ? R[t.id] ?? null : dm.resolverOf(db, t.id)) : null,
       damage_outcome: t.damage_outcome, enr_status: t.enr_status, enr_source: t.enr_source, enr_data: t.enr_data ? JSON.parse(t.enr_data) : null, enr_at: t.enr_at, version: t.version };
   }
+
+  // Lista de tickets: quién resolvió cada uno se trae en una sola consulta.
+  const rows = (list, N = names()) => { const R = dm.resolversOf(db, list.filter(t => t.status === 'Resuelto').map(t => t.id)); return list.map(t => row(t, N, R)); };
 
   // ---------- Registro (operadores y admins) ----------
   app.post('/api/incidents', wrap(req => dm.createIncident(db, req.user, req.body, now())));
@@ -97,7 +109,8 @@ function createApp(db, opts = {}) {
       w.push(`(code IN (SELECT value FROM json_each(?)) OR code LIKE ? ESCAPE '\\' OR trk LIKE ? ESCAPE '\\' OR (length(trk)>=8 AND instr(?, trk)>0))`);
       p.push(JSON.stringify(code ? dm.codeKeys(code) : []), like, like, s);
       const N = names();
-      return db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, id DESC LIMIT 100`).all(...p).map(t => row(t, N));
+      const list = db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, id DESC LIMIT 100`).all(...p);
+      return rows(list, N);
     }
     if (q.status === 'abiertos') w.push(dm.isOpenSql);
     else if (q.status === 'sin') w.push(dm.isOpenSql, 'owner_id IS NULL');
@@ -114,7 +127,7 @@ function createApp(db, opts = {}) {
     if (q.due === 'soon') { w.push(dm.isOpenSql, 'COALESCE(dup_due_at,due_at) BETWEEN ? AND ?'); p.push(t, t + D); }
     if (q.enr && ['buscando', 'lista', 'sin', 'error', 'na'].includes(q.enr)) { w.push('enr_status=?'); p.push(q.enr); }
     const N = names();
-    return db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, COALESCE(dup_due_at,due_at) LIMIT 500`).all(...p).map(t => row(t, N));
+    return rows(db.prepare(`SELECT * FROM tickets WHERE ${w.join(' AND ')} ORDER BY CASE WHEN ${dm.isOpenSql} THEN 0 ELSE 1 END, COALESCE(dup_due_at,due_at) LIMIT 500`).all(...p), N);
   }));
   app.get('/api/tickets/:id', wrap(req => {
     dm.needAdmin(req.user);
@@ -127,19 +140,19 @@ function createApp(db, opts = {}) {
   }));
   const act = (p, fn) => app.post('/api/tickets/:id/' + p, wrap(req => { fn(req, Number(req.params.id)); }));
   act('take', (req, id) => dm.take(db, req.user, id, now()));
-  act('release', (req, id) => dm.release(db, req.user, id));
-  act('transfer', (req, id) => dm.transfer(db, req.user, id, Number(req.body.to)));
-  act('waiting', (req, id) => dm.setWaiting(db, req.user, id, req.body.dept));
-  act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location));
+  act('release', (req, id) => dm.release(db, req.user, id, now()));
+  act('transfer', (req, id) => dm.transfer(db, req.user, id, Number(req.body.to), now()));
+  act('waiting', (req, id) => dm.setWaiting(db, req.user, id, req.body.dept, now()));
+  act('location', (req, id) => dm.setLocation(db, req.user, id, req.body.location, now()));
   act('confirm-dup', (req, id) => dm.confirmDup(db, req.user, id, now()));
   act('resolve', (req, id) => dm.resolve(db, req.user, id, req.body.resolution, now()));
   app.post('/api/tickets/:id/reopen', wrap(req => dm.reopen(db, req.user, Number(req.params.id), now())));
   app.post('/api/tickets/:id/quick-resolve', wrap(req => dm.quickResolve(db, req.user, Number(req.params.id), now())));
   act('dispose-done', (req, id) => dm.disposeDone(db, req.user, id, Number(req.body.evidence_id), now()));
   act('discard', (req, id) => dm.discard(db, req.user, id, req.body.reason, req.body.confirm === true, now()));
-  act('restore', (req, id) => dm.restore(db, req.user, id));
-  act('damage-outcome', (req, id) => dm.setDamageOutcome(db, req.user, id, req.body.outcome));
-  act('research', (req, id) => dm.research(db, req.user, id, req.body.value));
+  act('restore', (req, id) => dm.restore(db, req.user, id, now()));
+  act('damage-outcome', (req, id) => dm.setDamageOutcome(db, req.user, id, req.body.outcome, null, now()));
+  act('research', (req, id) => dm.research(db, req.user, id, req.body.value, now()));
 
   // Evidencias: se guardan en disco, nunca se borran desde la aplicación.
   const MIMES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'application/pdf': '.pdf' };
@@ -180,11 +193,11 @@ function createApp(db, opts = {}) {
 
   // Vistas especiales
   app.get('/api/duplicates', wrap(req => { dm.needAdmin(req.user); const N = names();
-    return db.prepare("SELECT * FROM tickets WHERE type='duplicado' AND status<>'Descartado' ORDER BY COALESCE(dup_due_at, due_at)").all().map(t => row(t, N)); }));
+    return rows(db.prepare("SELECT * FROM tickets WHERE type='duplicado' AND status<>'Descartado' ORDER BY COALESCE(dup_due_at, due_at)").all(), N); }));
   app.get('/api/damaged', wrap(req => { dm.needAdmin(req.user); const N = names();
     return db.prepare("SELECT * FROM tickets WHERE type='danado' AND status='Enviado dañado' ORDER BY id DESC LIMIT 500").all().map(t => row(t, N)); }));
   app.get('/api/discarded', wrap(req => { dm.needAdmin(req.user); const N = names();
-    return db.prepare("SELECT * FROM tickets WHERE status='Descartado' ORDER BY discarded_at DESC").all().map(t => row(t, N)); }));
+    return rows(db.prepare("SELECT * FROM tickets WHERE status='Descartado' ORDER BY discarded_at DESC").all(), N); }));
   app.get('/api/stats', wrap(req => {
     dm.needAdmin(req.user);
     const t = now(), day = new Date(t); day.setHours(0, 0, 0, 0);
@@ -233,8 +246,8 @@ if (require.main === module) {
   const port = Number(process.env.PORT || 8080);
   const server = app.listen(port, '0.0.0.0', () => {
     // Los procesos de fondo arrancan solo si este servidor quedó escuchando (evita dos copias trabajando a la vez).
-    setInterval(() => { try { dm.runDeadlines(db); } catch (e) { console.error('Plazos:', e.message); } }, 60e3);
-    dm.runDeadlines(db);
+    const plazos = () => { try { dm.runDeadlines(db); purgeSessions(db); } catch (e) { console.error('Plazos:', e.message); } };
+    setInterval(plazos, 60e3); plazos();
     // Respaldo automático al arrancar y cada 6 horas (últimos 30) en la carpeta "respaldos".
     const respaldo = () => { try { backup(db); } catch (e) { console.error('Respaldo:', e.message); } };
     respaldo(); setInterval(respaldo, 6 * H);
@@ -254,4 +267,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createApp };
+module.exports = { createApp, purgeSessions };

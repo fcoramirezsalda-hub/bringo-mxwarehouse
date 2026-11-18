@@ -62,7 +62,7 @@ async function syncOnce(db, cfg, { fetchImpl = fetch, now = Date.now() } = {}) {
     events: evs.map(e => [String(e.id), dm.folio(e.ticket_id), fmt(e.created_at), e.actor_label, e.kind, e.text]) };
   let res;
   try {
-    const r = await fetchImpl(cfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), redirect: 'follow' });
+    const r = await fetchImpl(cfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), redirect: 'follow', signal: AbortSignal.timeout(60000) });
     res = await r.json().catch(() => ({ ok: false, error: `Respuesta no válida (HTTP ${r.status})` }));
   } catch (e) { res = { ok: false, error: e.message }; }
   if (!res.ok) { setState(db, 'last_error', `${fmt(now)} · ${res.error || 'error desconocido'}`); throw new Error(res.error || 'No se pudo copiar a Google Sheets'); }

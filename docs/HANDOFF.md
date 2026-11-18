@@ -1,5 +1,21 @@
 # Handoff
 
+## 2026-11-18 (2) · Claude Code · revisión de código y 10 correcciones (v0.9.1)
+
+Revisión por apartado (servidor/sesión, reglas de tickets, agente, retornos, Google Sheets, interfaz). Sin migraciones ni dependencias nuevas.
+- **Agente (`worker.js`):** un trabajo cancelado por "nueva búsqueda" ya no revive al fallar (`failJob` solo actúa si sigue `running`) ni escribe un resultado viejo en el ticket (`finish` devuelve `false`).
+  Si falla la captura de pantalla, el trabajo ya quedó registrado y el agente no se cae.
+- **Sesión (`server.js`):** una cookie mal codificada de otro programa en la misma PC/IP daba 500 en toda la API; ahora se ignora.
+  Sesiones vencidas e intentos fallidos de más de un día se borran cada minuto (`purgeSessions`); los nombres inexistentes ya no se guardan en `login_failures`.
+- **Google Sheets (`sheets-sync.js`):** límite de 60 s por envío; antes una petición colgada detenía la copia sin aviso hasta reiniciar.
+- **Reabrir (`domain.js`):** si el responsable fue dado de baja, el ticket reabierto queda sin responsable (y se anota en el historial).
+- **Nueva búsqueda (`research`):** en una transacción y con `version+1`.
+- **Historial:** liberar, transferir, espera, ubicación, restaurar, desenlace y nueva búsqueda usan el reloj del servidor como el resto de acciones.
+- **Retornos (`retornos-escaneo.js`):** una guía anulada se puede volver a escanear; reutiliza la misma fila (la Clave única sigue siendo única) y el historial conserva la anulación. Ver DECISIONS.
+- **Bandeja:** "quién resolvió" se trae en una sola consulta (`dm.resolversOf`) en lugar de una por fila.
+- **Pruebas:** `npm test` 42/42 (nuevas en `test/correcciones.test.js`). Se reprodujeron antes del arreglo el trabajo revivido y el 500 por cookie.
+- **Falta:** la demo (`demo/mock-api.js`) no replica todavía "reabrir sin responsable dado de baja" ni "re-escanear anulado"; probar en la PC de la bodega con `actualizar.bat`.
+
 ## 2026-11-18 · Claude Code · los datos ya no se pierden al actualizar (v0.9.0)
 
 - **Problema:** el propietario perdió los datos al reiniciar tras actualizar. El servidor no borra nada al reiniciar; la base vivía en `app\data`,
