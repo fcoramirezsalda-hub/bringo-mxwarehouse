@@ -14,6 +14,8 @@ y un agente busca la información de la orden en Bringgo y EasyShip (solo lectur
 2. Descarga el repositorio (botón verde **Code → Download ZIP** en GitHub, o `git clone`) y descomprímelo en `C:\wms-agente`.
 3. En `C:\wms-agente\app`, clic derecho en **instalar-windows.bat → Ejecutar como administrador**.
 
+Para actualizar después, usa `actualizar.bat` (ver "Dónde están los datos").
+
 El instalador hace todo lo de la sección siguiente: dependencias, usuarios y PIN, arranque automático al iniciar sesión,
 firewall para la red privada, suspensión desactivada y la sesión de Bringgo/EasyShip para el agente. Se puede correr otra vez sin perder datos.
 
@@ -108,9 +110,27 @@ El menú "Retornos escaneados" está apagado por defecto. Para probarlo con dato
 `RETURNS_MODE=demo` (en Windows: `set RETURNS_MODE=demo` antes de `npm start`). No escribe en la hoja ni en el Site.
 La conexión con datos reales está pendiente de aprobación (`docs/ADR-001-retornos.md`).
 
-## Respaldos
+## Dónde están los datos y cómo actualizar sin perderlos
 
-Todo vive en la carpeta `data\` (base de datos y evidencias). Cópiala a otro lugar al final de cada día.
+Desde la v0.9.0 los datos viven **fuera de la carpeta del programa**, para que actualizar o reemplazar el código nunca los borre:
+
+| Qué | Dónde (Windows) |
+|---|---|
+| Base de datos y fotos (evidencias) | `C:\ProgramData\MX Wharehouse\data` |
+| Respaldos automáticos de la base | `C:\ProgramData\MX Wharehouse\respaldos` |
+| Sesión de Bringgo/EasyShip del agente | `C:\ProgramData\MX Wharehouse\perfil-agente` |
+
+`npm run datos` muestra la carpeta de datos. La variable `DATA_DIR` sigue funcionando para usar otra carpeta.
+
+- **Primera vez con la v0.9.0:** al arrancar, copia sola los datos de la ubicación anterior (`app\data`) a la nueva. No borra la anterior;
+  deja ahí `LEEME-DATOS-MOVIDOS.txt`. Si actualizas reemplazando la carpeta con un ZIP, **guarda antes `app\data`** (solo esta vez) y
+  pégala de vuelta en la carpeta nueva antes de arrancar.
+- **Actualizar:** doble clic a `actualizar.bat` (respaldo → `git pull` → `npm install`) y luego reinicia el servidor.
+  Si se instaló con ZIP, basta con reemplazar la carpeta del programa: los datos ya no están ahí.
+- **Respaldos:** el servidor guarda una copia de la base al arrancar y cada 6 horas (conserva las últimas 30). `npm run respaldo` hace una al momento.
+  Las fotos no entran en ese respaldo: copia `data\evidencias` aparte de vez en cuando.
+- **Restaurar:** detén el servidor, copia el respaldo como `incidencias.db` en la carpeta de datos (borra antes `incidencias.db-wal` y `incidencias.db-shm`) y arráncalo.
+- No ejecutes `npm run setup` para "arreglar" algo: solo agrega usuarios faltantes, pero en una carpeta de datos vacía crea una base nueva.
 
 ## Si algo falla
 

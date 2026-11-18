@@ -3,10 +3,10 @@
 //   npm run agent         Corre el agente sin ventana. Déjalo abierto durante el turno.
 // Variables opcionales: AGENT_FAKE=1 (datos de prueba, no abre navegador), HEADLESS=false, AGENT_PAUSE_MS=6000
 const path = require('path');
-const { open, DATA_DIR } = require('./db');
+const { open, DATA_DIR, agentProfile } = require('./db');
 const dm = require('./domain');
 
-const PROFILE = process.env.AGENT_PROFILE || path.join(__dirname, '..', 'perfil-agente');
+const PROFILE = agentProfile();
 const CAPTURES = path.join(DATA_DIR, 'capturas-agente');
 const PAUSE = Number(process.env.AGENT_PAUSE_MS || 6000);
 const FAKE = process.env.AGENT_FAKE === '1';
